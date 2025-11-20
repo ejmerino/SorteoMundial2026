@@ -57,25 +57,48 @@ const content = {
 const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: Team[], groups?: string[], onStop: () => void, duration?: number }) => {
   const itemHeight = 80;
   const listRef = useRef<HTMLDivElement>(null);
+  const [itemsToDisplay, setItemsToDisplay] = useState<any[]>([]);
 
   useEffect(() => {
-    const totalItems = teams ? teams.length : groups ? groups.length : 0;
-    if (totalItems <= 1 || !listRef.current) return;
+    let sourceItems: any[] = [];
+    if (teams) {
+      sourceItems = teams.map((team, i) => <div key={`${team.code}-${i}`} className="h-[80px] flex items-center justify-center"><TeamComponent team={team} variant="large" /></div>);
+    } else if (groups) {
+      sourceItems = groups.map((group, i) => <div key={`${group}-${i}`} className="h-[80px] flex items-center justify-center text-4xl font-bold">{group}</div>);
+    }
 
-    const totalHeight = totalItems * itemHeight;
-    const finalPosition = listRef.current.scrollTop + totalHeight * 3; // Scroll through the list multiple times
+    if (sourceItems.length > 0) {
+      const extended = [...sourceItems, ...sourceItems, ...sourceItems, ...sourceItems];
+      setItemsToDisplay(extended);
+    }
+  }, [teams, groups]);
 
-    listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
-    listRef.current.style.transform = `translateY(-${finalPosition}px)`;
+
+  useEffect(() => {
+    if (itemsToDisplay.length <= 1 || !listRef.current) return;
+
+    listRef.current.style.transform = `translateY(0px)`;
+    listRef.current.style.transition = 'none';
+    
+    const shuffleAndPick = () => {
+      const totalHeight = itemsToDisplay.length * itemHeight;
+      const randomOffset = Math.floor(Math.random() * itemsToDisplay.length) * itemHeight;
+      const finalPosition = totalHeight * 2 + randomOffset; // Ensure it spins a few times
+      
+      if (listRef.current) {
+        listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
+        listRef.current.style.transform = `translateY(-${finalPosition}px)`;
+      }
+    };
+    
+    requestAnimationFrame(() => {
+        requestAnimationFrame(shuffleAndPick);
+    });
 
     const timer = setTimeout(onStop, duration);
     return () => clearTimeout(timer);
-  }, [teams, groups, duration, onStop, itemHeight]);
+  }, [itemsToDisplay, duration, onStop, itemHeight]);
 
-  const items = teams ? 
-    teams.map((team, i) => <div key={`${team.code}-${i}`} className="h-[80px] flex items-center justify-center"><TeamComponent team={team} variant="large" /></div>) : 
-    groups ? 
-    groups.map((group, i) => <div key={`${group}-${i}`} className="h-[80px] flex items-center justify-center text-4xl font-bold">{group}</div>) : [];
 
   return (
     <div className="h-[80px] w-full overflow-hidden relative">
@@ -83,10 +106,7 @@ const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: T
         ref={listRef} 
         className="absolute top-0 left-0 w-full"
       >
-        {items}
-        {items}
-        {items}
-        {items}
+        {itemsToDisplay}
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-card via-transparent to-card" />
       <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[80px] border-y-2 border-accent" />
@@ -229,7 +249,20 @@ export default function DrawSimulator({ lang }: { lang: string }) {
             assignedGroupResult = shuffle(emptyPot1Groups)[0];
             positionInGroup = 1;
         } else {
-            assignedGroupResult = validGroups[0];
+            // "computer" logic: find first available group alphabetically
+            let placed = false;
+            for (const groupName of GROUP_NAMES) {
+                if (isGroupValid(team, tempGroups[groupName])) {
+                    assignedGroupResult = groupName;
+                    placed = true;
+                    break;
+                }
+            }
+
+            if (!placed) { // Should not happen with correct logic, but as a fallback
+                 assignedGroupResult = shuffle(validGroups)[0];
+            }
+            
             const availablePositions = [1, 2, 3, 4].filter(
               p => !tempGroups[assignedGroupResult as Group].some(t => t.positionInGroup === p)
             );
@@ -304,17 +337,22 @@ export default function DrawSimulator({ lang }: { lang: string }) {
           {state === 'picking-team' && animatingTeams.length > 0 && (
             <AnimationPicker teams={animatingTeams} onStop={() => {}} duration={2800} />
           )}
-          {(state === 'picked-team' || state === 'picking-group') && (
+          {state === 'picked-team' && (
             <Card className="h-full border-accent border-2 shadow-2xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
                 <TeamComponent team={team} variant="large" />
             </Card>
           )}
-          {state === 'picking-group' && animatingGroups.length > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-48">
-                 <AnimationPicker groups={animatingGroups} onStop={() => {}} duration={2800} />
-              </div>
-            </div>
+           {state === 'picking-group' && animatingGroups.length > 0 && (
+             <div className="h-full flex items-center justify-center gap-4">
+                <div className="w-48">
+                    <Card className="border-accent border-2 shadow-xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
+                        <TeamComponent team={team} variant="default" />
+                    </Card>
+                </div>
+                <div className="w-32">
+                    <AnimationPicker groups={animatingGroups} onStop={() => {}} duration={2800} />
+                </div>
+             </div>
           )}
            {state === 'picked-group' && assignedGroup && (
              <Card className="h-full border-primary border-2 shadow-2xl flex flex-col items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
