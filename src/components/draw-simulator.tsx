@@ -172,24 +172,23 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     const initialPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
     const initialGroups = Object.fromEntries(GROUP_NAMES.map(name => [name, []])) as Record<Group, Team[]>;
     
-    // Populate pots with all teams
     TEAMS.forEach(team => {
         initialPots[team.pot as Pot].push(team);
     });
     
-    // Handle hosts
     Object.entries(HOSTS).forEach(([hostName, groupName]) => {
       const team = TEAMS.find(t => t.name === hostName);
       if (team) {
         initialGroups[groupName].push({ ...team, positionInGroup: 1 });
-        // Remove hosts from their pots
         initialPots[team.pot as Pot] = initialPots[team.pot as Pot].filter(t => t.name !== hostName);
       }
     });
-    
-    // Create an ordered draw queue (pot 1, pot 2, etc.), excluding hosts
-    const teamsToDraw = TEAMS.filter(team => !HOSTS.hasOwnProperty(team.name));
-    teamsToDraw.sort((a, b) => a.pot - b.pot);
+
+    const teamsToDraw: Team[] = [];
+    ([1, 2, 3, 4] as Pot[]).forEach(potNum => {
+      teamsToDraw.push(...shuffle(initialPots[potNum]));
+    });
+
     drawQueue.current = teamsToDraw;
 
     setPots(initialPots);
@@ -211,11 +210,9 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     return Object.values(groups).flat().length;
   }, [groups]);
 
-  const isGroupValid = useCallback((team: Team, group: Team[], pot: Pot): boolean => {
+  const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
-    
-    // Rule: No more than one team from the same pot in a group.
-    if (group.some(t => t.pot === pot)) return false;
+    if (group.some(t => t.pot === team.pot)) return false;
 
     const uefaCount = group.filter(t => t.confederation === 'UEFA' || t.confederation.startsWith('UEFA_PLAYOFF')).length;
 
@@ -228,7 +225,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   }, []);
 
   const getValidGroupsForTeam = useCallback((team: Team, currentGroups: Record<Group, Team[]>) => {
-    return shuffle(GROUP_NAMES.filter(g => isGroupValid(team, currentGroups[g], team.pot)));
+    return shuffle(GROUP_NAMES.filter(g => isGroupValid(team, currentGroups[g])));
   }, [isGroupValid]);
 
   const handleStartDraw = (fast = false) => {
@@ -248,31 +245,37 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     initializeState();
   };
 
-  const runFastDraw = useCallback(() => {
+ const runFastDraw = useCallback(() => {
     let tempGroups = JSON.parse(JSON.stringify(groups)) as Record<Group, Team[]>;
-    let tempPots = JSON.parse(JSON.stringify(pots)) as Record<Pot, Team[]>;
-    let success = true;
+    
+    // Create a mutable copy of the draw queue
+    const teamsToPlace = [...drawQueue.current];
 
-    for (const potNum of [1, 2, 3, 4] as Pot[]) {
-        const teamsInPot = shuffle(tempPots[potNum]);
-        for (const team of teamsInPot) {
-            let placed = false;
-            const validGroups = getValidGroupsForTeam(team, tempGroups);
-            
-            if (validGroups.length > 0) {
-                const groupName = validGroups[0];
-                tempGroups[groupName].push({ ...team, positionInGroup: team.pot });
-                placed = true;
-            }
-            
-            if (!placed) {
-                toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
-                success = false;
-                break;
-            }
+    function solve(teamIndex: number): boolean {
+        if (teamIndex >= teamsToPlace.length) {
+            return true; // All teams placed
         }
-        if (!success) break;
+
+        const team = teamsToPlace[teamIndex];
+        const validGroups = getValidGroupsForTeam(team, tempGroups);
+
+        for (const groupName of validGroups) {
+            // Try placing the team
+            tempGroups[groupName].push({ ...team, positionInGroup: team.pot });
+
+            // Recurse
+            if (solve(teamIndex + 1)) {
+                return true;
+            }
+
+            // Backtrack
+            tempGroups[groupName] = tempGroups[groupName].filter(t => t.code !== team.code);
+        }
+
+        return false; // No solution found from this path
     }
+
+    const success = solve(0);
     
     if (success) {
       for (const groupName in tempGroups) {
@@ -285,9 +288,10 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       setDrawState('finished');
       setMessage(currentContent.drawComplete);
     } else {
+      toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: "Could not find a valid draw. Please reset." });
       initializeState();
     }
-}, [groups, pots, getValidGroupsForTeam, toast, currentContent, initializeState]);
+}, [groups, getValidGroupsForTeam, toast, currentContent, initializeState]);
 
   const handleNextStep = () => {
     if (drawState === 'ready_to_draw_team') {
@@ -522,5 +526,3 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
-
-    
