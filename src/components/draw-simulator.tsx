@@ -12,10 +12,11 @@ import { PotCard } from '@/components/pot-card';
 import { GroupCard } from '@/components/group-card';
 import TeamComponent from '@/components/team';
 import Schedule from '@/components/schedule';
-import { Play, RotateCw, Loader2, Award, ChevronsRight, Zap, ChevronRight, Filter } from 'lucide-react';
+import { Play, RotateCw, Loader2, Award, ChevronsRight, Zap, ChevronRight, Filter, Wrench } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const GROUP_NAMES: Group[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
@@ -46,6 +47,7 @@ const content = {
     ready: "Listo para el sorteo",
     scheduleTitle: "Calendario de Partidos",
     filterAndSort: "Filtrar y Ordenar",
+    underConstruction: "En construcción",
   },
   en: {
     startDraw: "Start Animated Draw",
@@ -67,6 +69,7 @@ const content = {
     ready: "Ready for the draw",
     scheduleTitle: "Match Schedule",
     filterAndSort: "Filter & Sort",
+    underConstruction: "Under Construction",
   },
 };
 
@@ -219,8 +222,9 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
   const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
-
-    // A group cannot have a team from the same pot (positionInGroup)
+    
+    // This rule was wrong. It should check for positionInGroup, not pot number.
+    // A group cannot have two teams with the same positionInGroup.
     if (group.some(t => t.positionInGroup === team.pot)) return false;
 
     // Confederation constraint
@@ -456,9 +460,26 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         return (
            <div className="h-full flex flex-col items-center justify-center text-center">
              <div className="flex flex-col sm:flex-row gap-4">
-                 <Button onClick={() => handleStartDraw(false)} size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg px-8 py-6 text-lg">
-                    <Play className="mr-2 h-5 w-5" /> {currentContent.startDraw}
-                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>
+                        <Button 
+                          onClick={() => handleStartDraw(false)} 
+                          size="lg" 
+                          className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg px-8 py-6 text-lg"
+                          disabled
+                        >
+                          <Wrench className="mr-2 h-5 w-5" /> {currentContent.startDraw}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{currentContent.underConstruction}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
                  <Button onClick={() => handleStartDraw(true)} size="lg" variant="secondary" className="shadow-lg px-8 py-6 text-lg">
                     <Zap className="mr-2 h-5 w-5" /> {currentContent.fastDraw}
                  </Button>
@@ -569,6 +590,3 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
-
-    
-
