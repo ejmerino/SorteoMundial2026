@@ -221,7 +221,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     if (group.length >= 4) return false;
 
     // A group cannot have more than one team from the same pot
-    if (group.some(t => t.positionInGroup === team.pot)) return false;
+    if (group.some(t => t.pot === team.pot)) return false;
 
     // Confederation constraint
     const uefaCount = group.filter(t => t.confederation.startsWith('UEFA')).length;

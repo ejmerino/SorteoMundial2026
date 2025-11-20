@@ -1,6 +1,6 @@
 'use client';
 import DrawSimulator from '@/components/draw-simulator';
-import { Globe, Languages, Moon, Sun, Trophy } from 'lucide-react';
+import { Globe, Languages, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import {
@@ -69,7 +69,10 @@ export default function Home() {
       <header className="py-4 px-4 sm:px-6 lg:px-8 border-b shadow-sm sticky top-0 z-40 bg-card/90 backdrop-blur-sm">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Trophy className="h-8 w-8 text-primary" />
+             <div className="relative h-12 w-12">
+              <Image src="/images/logo_copa_negro.png" alt="World Cup Logo" fill className="object-contain dark:hidden" />
+              <Image src="/images/logo_copa_blanco.png" alt="World Cup Logo" fill className="object-contain hidden dark:block" />
+            </div>
             <div className="flex flex-col">
               <h1 className="text-xl sm:text-2xl font-bold text-foreground font-headline tracking-tight">
                 {currentContent.title}
