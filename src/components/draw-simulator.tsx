@@ -88,22 +88,30 @@ const AnimationPicker = ({
   useEffect(() => {
     itemsRef.current = items;
     if (items.length > 0) {
-        const itemToElement = (item: Team | string, key: string) => (
-            <div key={key} className="h-[80px] flex items-center justify-center">
-                {typeof item === 'string' ? (
-                    <span className="text-4xl font-bold">{item}</span>
-                ) : (
-                    <TeamComponent team={item} variant="large" />
-                )}
-            </div>
-        );
+      const itemToElement = (item: Team | string, key: string) => (
+        <div key={key} className="h-[80px] flex items-center justify-center">
+          {typeof item === 'string' ? (
+            <span className="text-4xl font-bold">{item}</span>
+          ) : (
+            <TeamComponent team={item} variant="large" />
+          )}
+        </div>
+      );
 
-        const shuffled = shuffle([...items]);
-        const extended = Array(5).fill(shuffled).flat().map((item, index) => {
-            const itemKey = (typeof item === 'string' ? item : item.code) + `-${index}-${Math.random()}`;
-            return itemToElement(item, itemKey);
-        });
-        setDisplayList(extended);
+      // Ensure we have enough items to create a good visual effect
+      let animationPool = [...items];
+      while (animationPool.length > 0 && animationPool.length < 20) {
+        animationPool = [...animationPool, ...items];
+      }
+      
+      const shuffled = shuffle(animationPool);
+      const extended = Array(3).fill(shuffled).flat().map((item, index) => {
+          const uniqueKey = `${typeof item === 'string' ? item : item.code}-${index}-${Math.random()}`;
+          return itemToElement(item, uniqueKey);
+      });
+      setDisplayList(extended);
+    } else {
+      setDisplayList([]);
     }
 }, [items]);
 
@@ -120,8 +128,7 @@ const AnimationPicker = ({
       const sourceList = itemsRef.current;
       const selectedItemCode = typeof selectedItem === 'string' ? selectedItem : selectedItem.code;
       
-      const middleCycleIndex = Math.floor(3 * sourceList.length);
-      
+      // Find the index of the selected item in the original, non-extended list
       const targetIndexInCycle = sourceList.findIndex(item => (typeof item === 'string' ? item : item.code) === selectedItemCode);
       
       if (targetIndexInCycle === -1) {
@@ -130,8 +137,10 @@ const AnimationPicker = ({
           return;
       }
       
-      const targetIndex = middleCycleIndex + targetIndexInCycle;
-      const targetPosition = targetIndex * itemHeight;
+      // Target an item in the middle cycle of the extended list for a better visual
+      const middleCycleIndex = Math.floor(1 * sourceList.length);
+      const finalTargetIndex = middleCycleIndex + targetIndexInCycle;
+      const targetPosition = finalTargetIndex * itemHeight;
 
       listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
       listRef.current.style.transform = `translateY(-${targetPosition}px)`;
@@ -188,7 +197,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         initialPots[team.pot as Pot].push(team);
       }
     });
-
+    
+    // Assign hosts to their groups and remove them from pots
     Object.entries(HOSTS).forEach(([hostName, groupName]) => {
       const team = TEAMS.find(t => t.name === hostName);
       if (team) {
@@ -197,6 +207,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       }
     });
     
+    // Create the draw queue, ordered by pot
     const queue: Team[] = [];
     for (let potNum = 1; potNum <= 4; potNum++) {
       queue.push(...shuffle(initialPots[potNum as Pot]));
@@ -222,7 +233,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     return Object.values(groups).flat().length;
   }, [groups]);
 
-  const isGroupValid = (team: Team, group: Team[]): boolean => {
+  const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
     
     const uefaCount = group.filter(t => t.confederation === 'UEFA').length;
@@ -232,11 +243,11 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       if (group.some(t => t.confederation === team.confederation)) return false;
     }
     return true;
-  };
+  }, []);
 
-  const getValidGroupsForTeam = (team: Team, currentGroups: Record<Group, Team[]>) => {
+  const getValidGroupsForTeam = useCallback((team: Team, currentGroups: Record<Group, Team[]>) => {
     return GROUP_NAMES.filter(g => isGroupValid(team, currentGroups[g]));
-  }
+  }, [isGroupValid]);
 
   const handleStartDraw = (fast = false) => {
     if (fast) {
@@ -252,43 +263,44 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     initializeState();
   };
 
-  const runFastDraw = () => {
+  const runFastDraw = useCallback(() => {
     let tempGroups = JSON.parse(JSON.stringify(groups));
-    let teamsToDraw = [...drawQueue.current];
+    const teamsToDraw = [...drawQueue.current];
 
-    let success = true;
     for (const team of teamsToDraw) {
         const validGroups = shuffle(getValidGroupsForTeam(team, tempGroups));
         
         if (validGroups.length === 0) {
             toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
-            handleReset(); 
-            success = false;
-            break;
+            // On failure, reset to a clean state
+            initializeState();
+            return;
         }
 
         const chosenGroup = validGroups[0];
-        const availablePositions = [1, 2, 3, 4].filter(p => !tempGroups[chosenGroup].some((t: Team) => t.positionInGroup === p));
-        const positionInGroup = (team.pot === 1) ? 1 : shuffle(availablePositions)[0];
-
-        tempGroups[chosenGroup].push({ ...team, positionInGroup });
-        tempGroups[chosenGroup].sort((a: Team, b: Team) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+        tempGroups[chosenGroup].push({ ...team, positionInGroup: team.pot as Pot });
     }
     
-    if (success) {
-        const finalPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
-        
-        setGroups(tempGroups);
-        setPots(finalPots);
-        drawQueue.current = [];
-        setDrawState('finished');
-        setMessage(currentContent.drawComplete);
+    // Sort final groups by position
+    for (const groupName in tempGroups) {
+        tempGroups[groupName].sort((a: Team, b: Team) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
     }
-};
 
+    // Final state update
+    setGroups(tempGroups);
+    setPots({ 1: [], 2: [], 3: [], 4: [] }); // Empty all pots
+    drawQueue.current = [];
+    setDrawState('finished');
+    setMessage(currentContent.drawComplete);
+}, [groups, getValidGroupsForTeam, toast, currentContent, initializeState]);
 
   const handleNextStep = () => {
     if (drawState === 'ready_to_draw_team') {
+      if (drawQueue.current.length === 0) {
+        setDrawState('finished');
+        setMessage(currentContent.drawComplete);
+        return;
+      }
       const teamToDraw = drawQueue.current[0];
       setDrawnTeam(teamToDraw);
       setSelectedItem(teamToDraw);
@@ -309,14 +321,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         return;
       }
       
-      let finalGroup: Group;
-      if (drawnTeam.pot === 1) {
-        const emptyPot1Groups = GROUP_NAMES.filter(g => groups[g].length === 0);
-        finalGroup = shuffle(emptyPot1Groups)[0];
-      } else {
-        // For pots 2,3,4 find the first valid group alphabetically after shuffling
-        finalGroup = shuffle(validGroups)[0];
-      }
+      const finalGroup = shuffle(validGroups)[0];
 
       setAssignedGroup(finalGroup);
       setSelectedItem(finalGroup);
@@ -333,21 +338,11 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       setAnimatingItems([]);
     } else if (drawState === 'drawing_group' && drawnTeam && assignedGroup) {
       
-      let positionInGroup: Pot;
-      if(drawnTeam.pot === 1) {
-        positionInGroup = 1;
-      } else {
-        const availablePositions = [1, 2, 3, 4].filter(
-          p => !groups[assignedGroup].some(t => t.positionInGroup === p)
-        );
-        positionInGroup = shuffle(availablePositions)[0] as Pot;
-      }
-
-      const newTeam = { ...drawnTeam, positionInGroup };
+      const newTeamInGroup = { ...drawnTeam, positionInGroup: drawnTeam.pot as Pot };
 
       setGroups(prev => {
         const newGroups = {...prev};
-        newGroups[assignedGroup] = [...newGroups[assignedGroup], newTeam].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+        newGroups[assignedGroup] = [...newGroups[assignedGroup], newTeamInGroup].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
         return newGroups;
       });
       
@@ -492,7 +487,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
               </AnimatePresence>
             </div>
             <div className="flex items-center justify-center">
-              {drawState !== 'idle' && renderActionButton()}
+              {(drawState !== 'idle' && drawState !== 'finished') && renderActionButton()}
             </div>
           </div>
         </CardContent>
