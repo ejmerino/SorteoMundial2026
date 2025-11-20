@@ -563,18 +563,20 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {Object.entries(pots).map(([num, teams]) => (
-          <PotCard 
-            key={num} 
-            potNumber={parseInt(num, 10) as Pot} 
-            teams={teams} 
-            lang={lang} 
-            title={currentContent.pot}
-            isDrawing={drawState !== 'idle' && drawState !== 'finished' && currentPot === parseInt(num, 10)}
-          />
-        ))}
-      </div>
+      {drawState !== 'finished' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Object.entries(pots).map(([num, teams]) => (
+            <PotCard 
+              key={num} 
+              potNumber={parseInt(num, 10) as Pot} 
+              teams={teams} 
+              lang={lang} 
+              title={currentContent.pot}
+              isDrawing={drawState !== 'idle' && drawState !== 'finished' && currentPot === parseInt(num, 10)}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {GROUP_NAMES.map(groupName => (

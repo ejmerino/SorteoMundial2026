@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Copa Draw Simulator',
+  title: 'Simulador Sorteo Mundial 2026',
   description: 'Simulate the World Cup 2026 draw with official rules and restrictions.',
 };
 
