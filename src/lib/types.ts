@@ -12,3 +12,14 @@ export interface Team {
   pot: Pot;
   positionInGroup?: Pot;
 }
+
+export interface Match {
+    gameId: number;
+    date: string;
+    group: Group;
+    team1: string | { name: string; position: number };
+    team2: string | { name: string; position: number };
+    stadium: string;
+    city: string;
+    time: string;
+}

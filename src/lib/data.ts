@@ -33,7 +33,7 @@ export const TEAMS: Team[] = [
   // Pot 3
   { name: 'Norway', code: 'no', confederation: 'UEFA', pot: 3 },
   { name: 'Panama', code: 'pa', confederation: 'CONCACAF', pot: 3 },
-  { name_en: 'Egypt', name: 'Egipto', code: 'eg', confederation: 'CAF', pot: 3 },
+  { name: 'Egypt', name_en: 'Egypt', name: 'Egipto', code: 'eg', confederation: 'CAF', pot: 3 },
   { name: 'Algeria', code: 'dz', confederation: 'CAF', pot: 3 },
   { name: 'Scotland', code: 'gb-sct', confederation: 'UEFA', pot: 3 },
   { name: 'Paraguay', code: 'py', confederation: 'CONMEBOL', pot: 3 },
