@@ -53,8 +53,10 @@ export const TEAMS: Team[] = [
   { name: 'New Zealand', code: 'nz', confederation: 'OFC', pot: 4 },
   { name: 'Inter-Conf. Play-off A', code: 'fifa-a', confederation: 'PLAYOFF_A', pot: 4 },
   { name: 'Inter-Conf. Play-off B', code: 'fifa-b', confederation: 'PLAYOFF_B', pot: 4 },
-  { name: 'UEFA Play-off A', code: 'uefa-a', confederation: 'UEFA_PLAYOFF', pot: 4 },
-  { name: 'UEFA Play-off B', code: 'uefa-b', confederation: 'UEFA_PLAYOFF', pot: 4 },
-  { name: 'UEFA Play-off C', code: 'uefa-c', confederation: 'UEFA_PLAYOFF', pot: 4 },
-  { name: 'UEFA Play-off D', code: 'uefa-d', confederation: 'UEFA_PLAYOFF', pot: 4 },
+  { name: 'UEFA Play-off A', code: 'uefa-a', confederation: 'UEFA_PLAYOFF_A', pot: 4 },
+  { name: 'UEFA Play-off B', code: 'uefa-b', confederation: 'UEFA_PLAYOFF_B', pot: 4 },
+  { name: 'UEFA Play-off C', code: 'uefa-c', confederation: 'UEFA_PLAYOFF_C', pot: 4 },
+  { name: 'UEFA Play-off D', code: 'uefa-d', confederation: 'UEFA_PLAYOFF_D', pot: 4 },
 ];
+
+    

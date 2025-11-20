@@ -1,4 +1,4 @@
-export type Confederation = 'AFC' | 'CAF' | 'CONCACAF' | 'CONMEBOL' | 'OFC' | 'UEFA' | 'PLAYOFF_A' | 'PLAYOFF_B' | 'UEFA_PLAYOFF';
+export type Confederation = 'AFC' | 'CAF' | 'CONCACAF' | 'CONMEBOL' | 'OFC' | 'UEFA' | 'PLAYOFF_A' | 'PLAYOFF_B' | 'UEFA_PLAYOFF_A' | 'UEFA_PLAYOFF_B' | 'UEFA_PLAYOFF_C' | 'UEFA_PLAYOFF_D';
 
 export type Pot = 1 | 2 | 3 | 4;
 
@@ -24,5 +24,7 @@ export interface Match {
     country: string;
     time: string;
 }
+
+    
 
     

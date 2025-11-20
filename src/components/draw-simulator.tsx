@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEAMS } from '@/lib/data';
 import type { Team, Pot, Group, Confederation } from '@/lib/types';
-import { shuffle } from '@/lib/utils';
+import { shuffle, sleep } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { PotCard } from '@/components/pot-card';
@@ -70,32 +70,28 @@ type DrawState = 'idle' | 'ready_to_draw_team' | 'drawing_team' | 'team_drawn' |
 
 const AnimatedPicker = ({ items, onAnimationComplete, type }: { items: (Team | Group)[], onAnimationComplete: (item: Team | Group) => void, type: 'team' | 'group' }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const duration = 80; // ms per item
-    const totalAnimationTime = items.length * duration + 1000; // spin + final pause
-    
+    const duration = 80;
+    const totalAnimationTime = items.length * duration + 1000;
+
     useEffect(() => {
         if (items.length <= 1) {
-             if (items.length === 1) setTimeout(() => onAnimationComplete(items[0]), 500);
-             return;
-        };
-
-        const spin = () => {
-            const interval = setInterval(() => {
-                setCurrentIndex(prev => (prev + 1) % items.length);
-            }, duration);
-
-            setTimeout(() => {
-                clearInterval(interval);
-                onAnimationComplete(items[items.length - 1]);
-            }, totalAnimationTime - 1000);
+            if (items.length === 1) setTimeout(() => onAnimationComplete(items[0]), 500);
+            return;
         }
 
-        const handle = setTimeout(spin, 100);
+        const interval = setInterval(() => {
+            setCurrentIndex(prev => (prev + 1) % items.length);
+        }, duration);
+
+        setTimeout(() => {
+            clearInterval(interval);
+            onAnimationComplete(items[items.length - 1]);
+        }, totalAnimationTime - 1000);
 
         return () => {
-            clearTimeout(handle);
+            clearInterval(interval);
         };
-    }, [items, onAnimationComplete, totalAnimationTime, duration]);
+    }, [items, onAnimationComplete, duration, totalAnimationTime]);
 
     const renderItem = (item: Team | Group) => {
         if (type === 'team' && typeof item !== 'string') {
@@ -107,9 +103,11 @@ const AnimatedPicker = ({ items, onAnimationComplete, type }: { items: (Team | G
         return null;
     }
 
+    if (!items.length) return null;
+
     return (
         <div className="relative h-48 w-full flex items-center justify-center overflow-hidden">
-             <AnimatePresence>
+            <AnimatePresence>
                 <motion.div
                     key={currentIndex}
                     initial={{ y: 50, opacity: 0 }}
@@ -156,9 +154,11 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         initialPots[team.pot as Pot].push(team);
       }
     });
+
+    const teamsToPlace = [...TEAMS];
     
     Object.entries(HOSTS).forEach(([hostName, groupName]) => {
-      const team = TEAMS.find(t => t.name === hostName);
+      const team = teamsToPlace.find(t => t.name === hostName);
       if (team) {
         initialGroups[groupName].push({ ...team, positionInGroup: 1 });
         initialPots[team.pot as Pot] = initialPots[team.pot as Pot].filter(t => t.name !== hostName);
@@ -167,7 +167,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     
     const queue: Team[] = [];
     for (let potNum = 1; potNum <= 4; potNum++) {
-      queue.push(...shuffle(initialPots[potNum as Pot]));
+      const teamsInPot = initialPots[potNum as Pot];
+      queue.push(...shuffle(teamsInPot));
     }
     drawQueue.current = queue;
 
@@ -191,12 +192,12 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
     
-    const uefaCount = group.filter(t => t.confederation === 'UEFA' || t.confederation === 'UEFA_PLAYOFF').length;
+    const uefaCount = group.filter(t => t.confederation === 'UEFA' || t.confederation.startsWith('UEFA_PLAYOFF')).length;
 
-    if (team.confederation === 'UEFA' || team.confederation === 'UEFA_PLAYOFF') {
+    if (team.confederation === 'UEFA' || team.confederation.startsWith('UEFA_PLAYOFF')) {
       if (uefaCount >= 2) return false;
     } else {
-      if (group.some(t => t.confederation === team.confederation)) return false;
+      if (group.some(t => t.confederation === team.confederation && !team.confederation.startsWith('PLAYOFF'))) return false;
     }
     return true;
   }, []);
@@ -210,8 +211,11 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       runFastDraw();
     } else {
       setDrawState('ready_to_draw_team');
-      setCurrentPot(drawQueue.current[0].pot);
-      setMessage(currentContent.drawingTeam.replace('{pot}', '1'));
+      const nextTeam = drawQueue.current.length > 0 ? drawQueue.current[0] : null;
+      if (nextTeam) {
+        setCurrentPot(nextTeam.pot);
+        setMessage(currentContent.drawingTeam.replace('{pot}', nextTeam.pot.toString()));
+      }
     }
   };
 
@@ -225,16 +229,22 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     let success = true;
 
     for (const team of teamsToDraw) {
+        let placed = false;
         const validGroups = shuffle(getValidGroupsForTeam(team, tempGroups));
         
-        if (validGroups.length === 0) {
+        for (const groupName of validGroups) {
+            if (isGroupValid(team, tempGroups[groupName])) {
+                tempGroups[groupName].push({ ...team, positionInGroup: team.pot });
+                placed = true;
+                break;
+            }
+        }
+        
+        if (!placed) {
             toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
             success = false;
             break;
         }
-
-        const chosenGroup = validGroups[0];
-        tempGroups[chosenGroup].push({ ...team, positionInGroup: team.pot });
     }
     
     if (success) {
@@ -250,7 +260,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     } else {
       initializeState();
     }
-}, [groups, getValidGroupsForTeam, toast, currentContent, initializeState]);
+}, [groups, getValidGroupsForTeam, toast, currentContent, isGroupValid, initializeState]);
 
   const handleNextStep = () => {
     if (drawState === 'ready_to_draw_team') {
@@ -335,26 +345,21 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   const renderDrawArea = () => {
     switch (drawState) {
       case 'drawing_team':
-        return (
-           <AnimatedPicker 
-            items={animatingItems}
-            onAnimationComplete={onTeamAnimationComplete}
-            type="team"
-           />
-        );
-       case 'drawing_group':
+      case 'drawing_group':
         return (
           <div className="w-full h-full flex flex-col md:flex-row items-center justify-center gap-4">
-              <div className="w-full md:w-1/3">
-                <Card className="border-accent border-2 shadow-xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
-                    {drawnTeam && <TeamComponent team={drawnTeam} variant="default" />}
-                </Card>
-              </div>
+              {drawState === 'drawing_group' && (
+                <div className="w-full md:w-1/3">
+                  <Card className="border-accent border-2 shadow-xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
+                      {drawnTeam && <TeamComponent team={drawnTeam} variant="default" />}
+                  </Card>
+                </div>
+              )}
               <div className="w-full md:w-2/3">
                  <AnimatedPicker 
                   items={animatingItems}
-                  onAnimationComplete={onGroupAnimationComplete}
-                  type="group"
+                  onAnimationComplete={drawState === 'drawing_team' ? onTeamAnimationComplete : onGroupAnimationComplete}
+                  type={animationType}
                  />
               </div>
            </div>
@@ -485,3 +490,5 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
+
+    
