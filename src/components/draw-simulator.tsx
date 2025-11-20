@@ -236,12 +236,12 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
   const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
-    // A group cannot have more than one team from the same pot.
+    
     if (group.some(t => t.pot === team.pot)) return false;
 
-    const uefaCount = group.filter(t => t.confederation === 'UEFA' || t.confederation.startsWith('UEFA_PLAYOFF')).length;
+    const uefaCount = group.filter(t => t.confederation.startsWith('UEFA')).length;
 
-    if (team.confederation === 'UEFA' || team.confederation.startsWith('UEFA_PLAYOFF')) {
+    if (team.confederation.startsWith('UEFA')) {
       if (uefaCount >= 2) return false;
     } else {
       if (group.some(t => t.confederation === team.confederation && !team.confederation.startsWith('PLAYOFF'))) return false;
@@ -553,3 +553,5 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
+
+    
