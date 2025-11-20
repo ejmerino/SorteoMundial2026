@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEAMS } from '@/lib/data';
-import type { Team, Pot, Group } from '@/lib/types';
+import type { Team, Pot, Group, Confederation } from '@/lib/types';
 import { shuffle } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { PotCard } from '@/components/pot-card';
 import { GroupCard } from '@/components/group-card';
 import TeamComponent from '@/components/team';
 import Schedule from '@/components/schedule';
-import { Play, RotateCw, Loader2, Award, ChevronRight, ChevronsRight, Zap } from 'lucide-react';
+import { Play, RotateCw, Loader2, Award, ChevronsRight, Zap, ChevronRight } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 
@@ -29,7 +29,7 @@ const content = {
     fastDraw: "Sorteo Rápido",
     nextStep: "Siguiente",
     drawTeam: "Sortear Equipo",
-    drawGroup: "Sortear Grupo",
+    drawGroup: "Asignar Grupo",
     reset: "Reiniciar",
     drawingTeam: "Sorteando equipo del bombo {pot}...",
     assigningGroup: "Asignando grupo para {teamName}...",
@@ -49,7 +49,7 @@ const content = {
     fastDraw: "Fast Draw",
     nextStep: "Next",
     drawTeam: "Draw Team",
-    drawGroup: "Draw Group",
+    drawGroup: "Assign Group",
     reset: "Reset",
     drawingTeam: "Drawing team from pot {pot}...",
     assigningGroup: "Assigning group for {teamName}...",
@@ -68,103 +68,63 @@ const content = {
 
 type DrawState = 'idle' | 'ready_to_draw_team' | 'drawing_team' | 'team_drawn' | 'drawing_group' | 'group_assigned' | 'finished';
 
-const AnimationPicker = ({
-  items,
-  selectedItem,
-  onAnimationComplete,
-  itemHeight = 80,
-  duration = 2800
-}: {
-  items: (Team | string)[];
-  selectedItem: Team | string;
-  onAnimationComplete: () => void;
-  itemHeight?: number;
-  duration?: number;
-}) => {
-  const listRef = useRef<HTMLDivElement>(null);
-  const [displayList, setDisplayList] = useState<React.ReactNode[]>([]);
-  const itemsRef = useRef<(Team | string)[]>([]);
-  
-  useEffect(() => {
-    itemsRef.current = items;
-    if (items.length > 0) {
-      const itemToElement = (item: Team | string, key: string) => (
-        <div key={key} className="h-[80px] flex items-center justify-center">
-          {typeof item === 'string' ? (
-            <span className="text-4xl font-bold">{item}</span>
-          ) : (
-            <TeamComponent team={item} variant="large" />
-          )}
-        </div>
-      );
-
-      // Ensure we have enough items to create a good visual effect
-      let animationPool = [...items];
-      while (animationPool.length > 0 && animationPool.length < 20) {
-        animationPool = [...animationPool, ...items];
-      }
-      
-      const shuffled = shuffle(animationPool);
-      const extended = Array(3).fill(shuffled).flat().map((item, index) => {
-          const uniqueKey = `${typeof item === 'string' ? item : item.code}-${index}-${Math.random()}`;
-          return itemToElement(item, uniqueKey);
-      });
-      setDisplayList(extended);
-    } else {
-      setDisplayList([]);
-    }
-}, [items]);
-
-
-  useEffect(() => {
-    if (displayList.length === 0 || !listRef.current || !selectedItem) return;
-
-    listRef.current.style.transform = 'translateY(0px)';
-    listRef.current.style.transition = 'none';
-
-    const spin = () => {
-      if (!listRef.current) return;
-      
-      const sourceList = itemsRef.current;
-      const selectedItemCode = typeof selectedItem === 'string' ? selectedItem : selectedItem.code;
-      
-      // Find the index of the selected item in the original, non-extended list
-      const targetIndexInCycle = sourceList.findIndex(item => (typeof item === 'string' ? item : item.code) === selectedItemCode);
-      
-      if (targetIndexInCycle === -1) {
-          console.error("Selected item not found in animation list", selectedItem);
-          onAnimationComplete();
-          return;
-      }
-      
-      // Target an item in the middle cycle of the extended list for a better visual
-      const middleCycleIndex = Math.floor(1 * sourceList.length);
-      const finalTargetIndex = middleCycleIndex + targetIndexInCycle;
-      const targetPosition = finalTargetIndex * itemHeight;
-
-      listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
-      listRef.current.style.transform = `translateY(-${targetPosition}px)`;
-    }
-
-    const timerId = setTimeout(spin, 100);
-
-    const animationEndTimer = setTimeout(onAnimationComplete, duration + 100);
+const AnimatedPicker = ({ items, onAnimationComplete, type }: { items: (Team | Group)[], onAnimationComplete: (item: Team | Group) => void, type: 'team' | 'group' }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const duration = 80; // ms per item
+    const totalAnimationTime = items.length * duration + 1000; // spin + final pause
     
-    return () => {
-      clearTimeout(timerId);
-      clearTimeout(animationEndTimer);
-    };
-  }, [displayList, selectedItem, onAnimationComplete, duration, itemHeight]);
+    useEffect(() => {
+        if (items.length <= 1) {
+             if (items.length === 1) setTimeout(() => onAnimationComplete(items[0]), 500);
+             return;
+        };
 
-  return (
-    <div className="h-full w-full overflow-hidden relative">
-      <div ref={listRef} className="absolute top-0 left-0 w-full">
-        {displayList}
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-card/80 via-transparent to-card/80 pointer-events-none" />
-      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[80px] border-y-2 border-accent" />
-    </div>
-  );
+        const spin = () => {
+            const interval = setInterval(() => {
+                setCurrentIndex(prev => (prev + 1) % items.length);
+            }, duration);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                onAnimationComplete(items[items.length - 1]);
+            }, totalAnimationTime - 1000);
+        }
+
+        const handle = setTimeout(spin, 100);
+
+        return () => {
+            clearTimeout(handle);
+        };
+    }, [items, onAnimationComplete, totalAnimationTime, duration]);
+
+    const renderItem = (item: Team | Group) => {
+        if (type === 'team' && typeof item !== 'string') {
+            return <TeamComponent team={item as Team} variant="large" />;
+        }
+        if (type === 'group' && typeof item === 'string') {
+            return <div className="text-6xl font-black text-center">{item}</div>;
+        }
+        return null;
+    }
+
+    return (
+        <div className="relative h-48 w-full flex items-center justify-center overflow-hidden">
+             <AnimatePresence>
+                <motion.div
+                    key={currentIndex}
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -50, opacity: 0 }}
+                    transition={{ duration: duration / 2000 }}
+                    className="absolute"
+                >
+                    {renderItem(items[currentIndex])}
+                </motion.div>
+            </AnimatePresence>
+            <div className="absolute inset-0 bg-gradient-to-b from-card/80 via-transparent to-card/80 pointer-events-none" />
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[120px] border-y-2 border-accent" />
+        </div>
+    );
 };
 
 
@@ -179,10 +139,9 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   const [message, setMessage] = useState("");
   const [currentPot, setCurrentPot] = useState<Pot>(1);
   const [drawnTeam, setDrawnTeam] = useState<Team | null>(null);
-  const [assignedGroup, setAssignedGroup] = useState<Group | null>(null);
   
-  const [animatingItems, setAnimatingItems] = useState<(Team | string)[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Team | string | null>(null);
+  const [animatingItems, setAnimatingItems] = useState<(Team | Group)[]>([]);
+  const [animationType, setAnimationType] = useState<'team' | 'group'>('team');
 
   const drawQueue = useRef<Team[]>([]);
   
@@ -198,7 +157,6 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       }
     });
     
-    // Assign hosts to their groups and remove them from pots
     Object.entries(HOSTS).forEach(([hostName, groupName]) => {
       const team = TEAMS.find(t => t.name === hostName);
       if (team) {
@@ -207,7 +165,6 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       }
     });
     
-    // Create the draw queue, ordered by pot
     const queue: Team[] = [];
     for (let potNum = 1; potNum <= 4; potNum++) {
       queue.push(...shuffle(initialPots[potNum as Pot]));
@@ -220,9 +177,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     setMessage(currentContent.ready);
     setCurrentPot(1);
     setDrawnTeam(null);
-    setAssignedGroup(null);
     setAnimatingItems([]);
-    setSelectedItem(null);
   }, [currentContent.ready]);
 
   useEffect(() => {
@@ -236,8 +191,9 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
     
-    const uefaCount = group.filter(t => t.confederation === 'UEFA').length;
-    if (team.confederation === 'UEFA') {
+    const uefaCount = group.filter(t => t.confederation === 'UEFA' || t.confederation === 'UEFA_PLAYOFF').length;
+
+    if (team.confederation === 'UEFA' || team.confederation === 'UEFA_PLAYOFF') {
       if (uefaCount >= 2) return false;
     } else {
       if (group.some(t => t.confederation === team.confederation)) return false;
@@ -264,34 +220,36 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   };
 
   const runFastDraw = useCallback(() => {
-    let tempGroups = JSON.parse(JSON.stringify(groups));
-    const teamsToDraw = [...drawQueue.current];
+    let tempGroups = JSON.parse(JSON.stringify(groups)) as Record<Group, Team[]>;
+    let teamsToDraw = [...drawQueue.current];
+    let success = true;
 
     for (const team of teamsToDraw) {
         const validGroups = shuffle(getValidGroupsForTeam(team, tempGroups));
         
         if (validGroups.length === 0) {
             toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
-            // On failure, reset to a clean state
-            initializeState();
-            return;
+            success = false;
+            break;
         }
 
         const chosenGroup = validGroups[0];
-        tempGroups[chosenGroup].push({ ...team, positionInGroup: team.pot as Pot });
+        tempGroups[chosenGroup].push({ ...team, positionInGroup: team.pot });
     }
     
-    // Sort final groups by position
-    for (const groupName in tempGroups) {
-        tempGroups[groupName].sort((a: Team, b: Team) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
-    }
+    if (success) {
+      for (const groupName in tempGroups) {
+          tempGroups[groupName as Group].sort((a, b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+      }
 
-    // Final state update
-    setGroups(tempGroups);
-    setPots({ 1: [], 2: [], 3: [], 4: [] }); // Empty all pots
-    drawQueue.current = [];
-    setDrawState('finished');
-    setMessage(currentContent.drawComplete);
+      setGroups(tempGroups);
+      setPots({ 1: [], 2: [], 3: [], 4: [] });
+      drawQueue.current = [];
+      setDrawState('finished');
+      setMessage(currentContent.drawComplete);
+    } else {
+      initializeState();
+    }
 }, [groups, getValidGroupsForTeam, toast, currentContent, initializeState]);
 
   const handleNextStep = () => {
@@ -301,12 +259,14 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         setMessage(currentContent.drawComplete);
         return;
       }
+      
       const teamToDraw = drawQueue.current[0];
-      setDrawnTeam(teamToDraw);
-      setSelectedItem(teamToDraw);
-      setCurrentPot(teamToDraw.pot);
-      setAnimatingItems(pots[teamToDraw.pot]);
+      const teamsInPot = pots[teamToDraw.pot];
+      
+      setAnimatingItems([...shuffle(teamsInPot.filter(t => t.code !== teamToDraw.code)), teamToDraw]);
+      setAnimationType('team');
       setDrawState('drawing_team');
+      setCurrentPot(teamToDraw.pot);
       setMessage(currentContent.drawingTeam.replace('{pot}', teamToDraw.pot.toString()));
 
     } else if (drawState === 'team_drawn' && drawnTeam) {
@@ -323,41 +283,43 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       
       const finalGroup = shuffle(validGroups)[0];
 
-      setAssignedGroup(finalGroup);
-      setSelectedItem(finalGroup);
-      setAnimatingItems(validGroups);
+      setAnimatingItems([...shuffle(validGroups.filter(g => g !== finalGroup)), finalGroup]);
+      setAnimationType('group');
       setDrawState('drawing_group');
       setMessage(currentContent.assigningGroup.replace('{teamName}', drawnTeam.name));
     }
   };
 
-  const onAnimationComplete = () => {
-    if (drawState === 'drawing_team' && drawnTeam) {
-      setPots(prev => ({...prev, [drawnTeam.pot]: prev[drawnTeam.pot].filter(t => t.code !== drawnTeam.code)}));
-      setDrawState('team_drawn');
-      setAnimatingItems([]);
-    } else if (drawState === 'drawing_group' && drawnTeam && assignedGroup) {
-      
+  const onTeamAnimationComplete = (item: Team | Group) => {
+    const team = item as Team;
+    setDrawnTeam(team);
+    setPots(prev => ({...prev, [team.pot]: prev[team.pot].filter(t => t.code !== team.code)}));
+    setDrawState('team_drawn');
+    setAnimatingItems([]);
+  }
+  
+  const onGroupAnimationComplete = (item: Team | Group) => {
+      const groupName = item as Group;
+      if (!drawnTeam) return;
+
       const newTeamInGroup = { ...drawnTeam, positionInGroup: drawnTeam.pot as Pot };
 
       setGroups(prev => {
         const newGroups = {...prev};
-        newGroups[assignedGroup] = [...newGroups[assignedGroup], newTeamInGroup].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+        newGroups[groupName] = [...newGroups[groupName], newTeamInGroup].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
         return newGroups;
       });
       
       toast({
         title: currentContent.groupAssigned
           .replace('{teamName}', drawnTeam.name)
-          .replace('{groupName}', assignedGroup),
+          .replace('{groupName}', groupName),
         description: currentContent.toastDescription
       });
 
       drawQueue.current.shift();
       setDrawnTeam(null);
-      setAssignedGroup(null);
       setAnimatingItems([]);
-      setSelectedItem(null);
       
       if (drawQueue.current.length === 0) {
         setDrawState('finished');
@@ -368,32 +330,35 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         setMessage(currentContent.drawingTeam.replace('{pot}', nextTeamPot.toString()));
         setDrawState('ready_to_draw_team');
       }
-    }
   }
   
   const renderDrawArea = () => {
     switch (drawState) {
       case 'drawing_team':
-      case 'drawing_group':
         return (
-           <div className="w-full h-full flex items-center justify-center gap-4">
-              {drawState === 'drawing_group' && drawnTeam && (
-                <div className="w-1/3">
-                  <Card className="border-accent border-2 shadow-xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
-                      <TeamComponent team={drawnTeam} variant="default" />
-                  </Card>
-                </div>
-              )}
-              <div className={drawState === 'drawing_group' ? "w-2/3" : "w-full"}>
-                  <AnimationPicker 
-                    items={animatingItems}
-                    selectedItem={selectedItem!}
-                    onAnimationComplete={onAnimationComplete}
-                  />
+           <AnimatedPicker 
+            items={animatingItems}
+            onAnimationComplete={onTeamAnimationComplete}
+            type="team"
+           />
+        );
+       case 'drawing_group':
+        return (
+          <div className="w-full h-full flex flex-col md:flex-row items-center justify-center gap-4">
+              <div className="w-full md:w-1/3">
+                <Card className="border-accent border-2 shadow-xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
+                    {drawnTeam && <TeamComponent team={drawnTeam} variant="default" />}
+                </Card>
+              </div>
+              <div className="w-full md:w-2/3">
+                 <AnimatedPicker 
+                  items={animatingItems}
+                  onAnimationComplete={onGroupAnimationComplete}
+                  type="group"
+                 />
               </div>
            </div>
         );
-
       case 'team_drawn':
         if (!drawnTeam) return null;
         return (
@@ -481,7 +446,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         </CardHeader>
         <CardContent className="p-4 bg-secondary/30 min-h-[16rem]">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 h-full">
-            <div className="w-full sm:w-2/3 h-48 sm:h-full relative">
+            <div className="w-full sm:w-2/3 h-full relative flex items-center justify-center">
               <AnimatePresence mode="wait">
                 {renderDrawArea()}
               </AnimatePresence>
