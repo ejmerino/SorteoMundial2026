@@ -1,6 +1,6 @@
 'use client';
 import DrawSimulator from '@/components/draw-simulator';
-import { Globe, Languages, Moon, Sun } from 'lucide-react';
+import { Globe, Languages, Moon, Sun, Trophy } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,8 +36,9 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
     const browserLang = navigator.language.split('-')[0];
-    if (browserLang === 'en') {
-      setLang('en');
+    if (browserLang === 'en' || browserLang === 'es') {
+      setLang(browserLang);
+      document.documentElement.lang = browserLang;
     }
   }, []);
 
@@ -57,19 +58,21 @@ export default function Home() {
   const currentContent = content[lang as keyof typeof content];
 
   return (
-    <div className="flex flex-col min-h-screen bg-background font-sans">
-      <header className="py-4 px-4 sm:px-6 lg:px-8 border-b shadow-sm sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+    <div className="flex flex-col min-h-screen bg-background font-sans text-foreground">
+      <header className="py-4 px-4 sm:px-6 lg:px-8 border-b shadow-sm sticky top-0 z-40 bg-card/90 backdrop-blur-sm">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Globe className="h-8 w-8 text-primary" />
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground font-headline tracking-tight">
-              {currentContent.title}
-            </h1>
+            <Trophy className="h-8 w-8 text-primary" />
+            <div className="flex flex-col">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground font-headline tracking-tight">
+                {currentContent.title}
+              </h1>
+              <p className="text-xs font-semibold text-muted-foreground hidden sm:block">
+                {currentContent.subtitle}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-muted-foreground hidden sm:block">
-              {currentContent.subtitle}
-            </p>
              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
