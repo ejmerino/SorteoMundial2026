@@ -109,7 +109,7 @@ const AnimatedPicker = ({ items, onAnimationComplete, type, selectedItem }: { it
 
         return () => clearInterval(interval);
 
-    }, [items, selectedItem, finalItemIndex, onAnimationComplete]);
+    }, [items, selectedItem, finalItemIndex, onAnimationComplete, animationDuration, type]);
 
     const renderItem = (item: Team | Group) => {
         if (type === 'team' && typeof item !== 'string') {
@@ -178,19 +178,11 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     });
 
     const teamsToDraw: Team[] = [];
+    const nonHostTeams = TEAMS.filter(t => !Object.keys(HOSTS).includes(t.name));
+    
+    // Strict ordering by pot
     ([1, 2, 3, 4] as Pot[]).forEach(potNum => {
-        const potTeams = TEAMS.filter(t => t.pot === potNum && !Object.keys(HOSTS).includes(t.name));
-        
-        // "Rigged" logic: sort teams to draw constrained ones first
-        potTeams.sort((a,b) => {
-            const aIsUefa = a.confederation.startsWith('UEFA');
-            const bIsUefa = b.confederation.startsWith('UEFA');
-            if (aIsUefa && !bIsUefa) return 1;
-            if (!aIsUefa && bIsUefa) return -1;
-            return 0;
-        });
-
-        teamsToDraw.push(...shuffle(potTeams));
+        teamsToDraw.push(...nonHostTeams.filter(t => t.pot === potNum));
     });
     
     drawQueue.current = teamsToDraw;
@@ -306,13 +298,37 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         return;
       }
       
-      const teamToDraw = drawQueue.current[0];
-      const teamsInPotForAnimation = TEAMS.filter(t => 
+      const currentPotVal = drawQueue.current[0].pot;
+      let teamsInCurrentPot = drawQueue.current.filter(t => t.pot === currentPotVal);
+      
+      // "Rigged" logic: sort teams to draw constrained ones first
+      const confederationPriority: Confederation[] = ['CONMEBOL', 'CAF', 'AFC', 'CONCACAF', 'OFC'];
+      teamsInCurrentPot.sort((a,b) => {
+          const aPrio = confederationPriority.indexOf(a.confederation as any);
+          const bPrio = confederationPriority.indexOf(b.confederation as any);
+          
+          if(aPrio === -1 && bPrio > -1) return 1; // UEFA/Playoffs go last
+          if(aPrio > -1 && bPrio === -1) return -1;
+          if(aPrio > bPrio) return -1;
+          if(aPrio < bPrio) return 1;
+          return 0;
+      });
+
+      const teamToDraw = teamsInCurrentPot[0];
+      
+      // Find and remove the chosen team from the main queue
+      const teamIndexInQueue = drawQueue.current.findIndex(t => t.code === teamToDraw.code);
+      if (teamIndexInQueue !== -1) {
+          const [removedTeam] = drawQueue.current.splice(teamIndexInQueue, 1);
+          // Put it at the front to be processed
+          drawQueue.current.unshift(removedTeam);
+      }
+      
+      const teamsForAnimation = TEAMS.filter(t => 
         drawQueue.current.some(dq => dq.code === t.code && t.pot === teamToDraw.pot)
       );
       
-      setAnimatingItems(shuffle([...teamsInPotForAnimation]));
-      setAnimationType('team');
+      setAnimatingItems(shuffle([...teamsForAnimation]));
       setSelectedItem(teamToDraw);
       setDrawState('drawing_team');
       setCurrentPot(teamToDraw.pot);
@@ -367,11 +383,12 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         description: currentContent.toastDescription
       });
       
+      // Actually remove team from the queue
+      drawQueue.current.shift();
+      
       // Visually remove the drawn team from its pot AFTER group assignment
       setPots(prev => ({...prev, [drawnTeam.pot]: prev[drawnTeam.pot].filter(t => t.code !== drawnTeam.code)}));
       
-      // Actually remove team from the queue
-      drawQueue.current.shift();
       setDrawnTeam(null);
       setAnimatingItems([]);
       setSelectedItem(null);
@@ -536,5 +553,3 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
-
-    
