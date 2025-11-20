@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from 'react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEAMS } from '@/lib/data';
