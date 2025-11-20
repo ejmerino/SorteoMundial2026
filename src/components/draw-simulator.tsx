@@ -55,10 +55,23 @@ const content = {
   },
 };
 
-const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: Team[], groups?: string[], onStop: () => void, duration?: number }) => {
+const AnimationPicker = ({ 
+  teams, 
+  groups, 
+  onStop, 
+  selectedItem,
+  duration = 3000 
+}: { 
+  teams?: Team[], 
+  groups?: string[], 
+  onStop: () => void, 
+  selectedItem: Team | string,
+  duration?: number 
+}) => {
   const itemHeight = 80;
   const listRef = useRef<HTMLDivElement>(null);
   const [itemsToDisplay, setItemsToDisplay] = useState<any[]>([]);
+  const sourceItemsRef = useRef<any[]>([]);
 
   useEffect(() => {
     let sourceItems: any[] = [];
@@ -67,8 +80,10 @@ const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: T
     } else if (groups) {
       sourceItems = groups.map((group, i) => <div key={`${group}-${i}`} className="h-[80px] flex items-center justify-center text-4xl font-bold">{group}</div>);
     }
+    sourceItemsRef.current = sourceItems;
 
     if (sourceItems.length > 0) {
+      // Extend the list for a seamless loop effect
       const extended = Array(5).fill(sourceItems).flat().map((item, index) => React.cloneElement(item, { key: `${item.key}-${index}` }));
       setItemsToDisplay(extended);
     }
@@ -76,33 +91,51 @@ const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: T
 
 
   useEffect(() => {
-    if (itemsToDisplay.length <= 1 || !listRef.current) return;
+    if (itemsToDisplay.length <= 1 || !listRef.current || !selectedItem) return;
 
     listRef.current.style.transform = `translateY(0px)`;
     listRef.current.style.transition = 'none';
     
-    const shuffleAndPick = () => {
-      const totalHeight = listRef.current?.scrollHeight || 0;
-      // Adjust the multiplier and logic to get a good random spin
-      const spinCycles = 3;
-      const basePosition = (itemsToDisplay.length / 5) * itemHeight * spinCycles;
-      const randomOffset = Math.floor(Math.random() * (itemsToDisplay.length / 5)) * itemHeight;
+    const spinToTarget = () => {
+      if (!listRef.current) return;
 
-      const finalPosition = basePosition + randomOffset;
-      
-      if (listRef.current) {
-        listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
-        listRef.current.style.transform = `translateY(-${finalPosition}px)`;
+      const sourceList = sourceItemsRef.current;
+      const targetIndex = sourceList.findIndex(item => {
+        if (typeof selectedItem === 'string') {
+            return item.key.startsWith(selectedItem);
+        }
+        return item.key.startsWith((selectedItem as Team).code);
+      });
+
+      if (targetIndex === -1) {
+        console.error("Selected item not found in animation list");
+        return;
       }
+
+      const totalHeight = listRef.current.scrollHeight;
+      const singleCycleHeight = sourceList.length * itemHeight;
+
+      // Calculate the base position to land on the target item in one of the later cycles
+      const spinCycles = 3; // Number of full spins
+      const basePosition = singleCycleHeight * spinCycles;
+      
+      // Position of the target item within a single cycle
+      const targetOffset = targetIndex * itemHeight;
+
+      const finalPosition = basePosition + targetOffset;
+      
+      listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
+      listRef.current.style.transform = `translateY(-${finalPosition}px)`;
     };
     
+    // Using requestAnimationFrame to ensure the initial styles are applied before starting the animation
     requestAnimationFrame(() => {
-        requestAnimationFrame(shuffleAndPick);
+        requestAnimationFrame(spinToTarget);
     });
 
     const timer = setTimeout(onStop, duration);
     return () => clearTimeout(timer);
-  }, [itemsToDisplay, duration, onStop, itemHeight]);
+  }, [itemsToDisplay, selectedItem, duration, onStop, itemHeight]);
 
 
   return (
@@ -113,7 +146,9 @@ const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: T
       >
         {itemsToDisplay}
       </div>
+      {/* Overlay Gradients */}
       <div className="absolute inset-0 bg-gradient-to-b from-card via-transparent to-card" />
+      {/* Selection Indicator */}
       <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[80px] border-y-2 border-accent" />
     </div>
   );
@@ -144,6 +179,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     
     const teamsToPlace = [...TEAMS];
     
+    // Pre-assign hosts to their groups
     Object.entries(HOSTS).forEach(([hostName, groupName]) => {
         const teamIndex = teamsToPlace.findIndex(t => t.name === hostName);
         if (teamIndex > -1) {
@@ -189,6 +225,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     if (team.confederation === 'UEFA') {
       if (uefaCount >= 2) return false;
     } else {
+      // Check for any other non-UEFA confederation duplicates
       if (group.some(t => t.confederation === team.confederation)) return false;
     }
     return true;
@@ -214,6 +251,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       const currentPotTeams = [...tempPots[potNum as Pot]];
       
       for (const team of currentPotTeams) {
+        // Hosts from Pot 1 are already placed
         if (team.pot === 1 && Object.keys(HOSTS).includes(team.name)) {
           continue; 
         }
@@ -225,11 +263,14 @@ export default function DrawSimulator({ lang }: { lang: string }) {
             setCurrentPick({team, state: 'picking-team'});
             await sleep(teamPickDelay); 
             
+            // Now that animation is "done", update state to show picked team
             setCurrentPick({team, state: 'picked-team'});
             tempPots[potNum as Pot] = tempPots[potNum as Pot].filter((t: Team) => t.code !== team.code);
+            // Visually remove from pot
             setPots(prev => ({...prev, [potNum]: prev[potNum as Pot].filter(p => p.code !== team.code)}));
-            await sleep(1000); 
+            await sleep(1000); // Pause to show the picked team
         } else {
+             // instant removal for fast draw
              tempPots[potNum as Pot] = tempPots[potNum as Pot].filter((t: Team) => t.code !== team.code);
         }
         
@@ -250,11 +291,13 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         }
 
         if (team.pot === 1) {
+            // For Pot 1 teams, they must go into an empty group's position 1.
             const emptyPot1Groups = GROUP_NAMES.filter(g => tempGroups[g].length === 0);
             assignedGroupResult = shuffle(emptyPot1Groups)[0];
             positionInGroup = 1;
         } else {
-            // "computer" logic: find first available group alphabetically
+            // Standard procedure for Pots 2, 3, 4
+            // Find the first available group alphabetically that satisfies confederation rules.
             let placed = false;
             for (const groupName of GROUP_NAMES) {
                 if (isGroupValid(team, tempGroups[groupName])) {
@@ -264,10 +307,12 @@ export default function DrawSimulator({ lang }: { lang: string }) {
                 }
             }
 
-            if (!placed) { // Should not happen with correct logic, but as a fallback
+            // Fallback (shouldn't be needed with proper logic, but safe to have)
+            if (!placed) { 
                  assignedGroupResult = shuffle(validGroups)[0];
             }
             
+            // Assign a random available position within the chosen group
             const availablePositions = [1, 2, 3, 4].filter(
               p => !tempGroups[assignedGroupResult as Group].some(t => t.positionInGroup === p)
             );
@@ -279,21 +324,24 @@ export default function DrawSimulator({ lang }: { lang: string }) {
                 setMessage(`${currentContent.drawingGroup}`);
                 const groupsForAnimation = shuffle(validGroups.map(g => g.toString()));
                 setAnimatingGroups(groupsForAnimation);
-                setAssignedGroup(assignedGroupResult);
+                setAssignedGroup(assignedGroupResult); // This is the "winner"
                 setCurrentPick({team, state: 'picking-group'});
                 await sleep(groupPickDelay);
                 setCurrentPick({team, state: 'picked-group'});
                 await sleep(1000);
             }
 
+            // Update the temporary state for the next iteration's logic
             tempGroups[assignedGroupResult].push({ ...team, positionInGroup });
             
             if (drawMode === 'animated') {
+                // Update the visible state after animation
                 setGroups({ ...tempGroups });
                 setCurrentPick(null);
                 await sleep(finalDelay);
             }
         } else {
+            // Error case if no valid group or position is found
             toast({
               variant: "destructive",
               title: currentContent.drawErrorTitle,
@@ -306,11 +354,13 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       }
       
       if (drawMode === 'fast') {
+          // Batch update pots at the end of each pot's draw for fast mode
           setPots(current => ({...current, ...tempPots}));
       }
       setCurrentPick(null);
     }
     
+    // Final state update for both modes
     setGroups(tempGroups);
     setPots({ 1: [], 2: [], 3: [], 4: [] });
     setMessage(currentContent.drawComplete);
@@ -340,14 +390,14 @@ export default function DrawSimulator({ lang }: { lang: string }) {
           className="h-full w-full"
         >
           {state === 'picking-team' && animatingTeams.length > 0 && (
-            <AnimationPicker teams={animatingTeams} onStop={() => {}} duration={2800} />
+            <AnimationPicker teams={animatingTeams} onStop={() => {}} duration={2800} selectedItem={team} />
           )}
           {state === 'picked-team' && (
             <Card className="h-full border-accent border-2 shadow-2xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
                 <TeamComponent team={team} variant="large" />
             </Card>
           )}
-           {state === 'picking-group' && animatingGroups.length > 0 && (
+           {state === 'picking-group' && animatingGroups.length > 0 && assignedGroup && (
              <div className="h-full flex items-center justify-center gap-4">
                 <div className="w-48">
                     <Card className="border-accent border-2 shadow-xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
@@ -355,7 +405,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
                     </Card>
                 </div>
                 <div className="w-32">
-                    <AnimationPicker groups={animatingGroups} onStop={() => {}} duration={2800} />
+                    <AnimationPicker groups={animatingGroups} onStop={() => {}} duration={2800} selectedItem={assignedGroup} />
                 </div>
              </div>
           )}
