@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { PotCard } from '@/components/pot-card';
 import { GroupCard } from '@/components/group-card';
 import TeamComponent from '@/components/team';
-import { Play, RotateCw, Loader2, Award, ChevronRight, ChevronsRight } from 'lucide-react';
+import { Play, RotateCw, Loader2, Award, ChevronRight, ChevronsRight, Zap } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 
@@ -24,12 +24,12 @@ const HOSTS: Record<string, Group> = {
 
 const content = {
   es: {
-    startDraw: "Iniciar Sorteo",
+    startDraw: "Iniciar Sorteo Animado",
+    fastDraw: "Sorteo Rápido",
     nextStep: "Siguiente",
     drawTeam: "Sortear Equipo",
     drawGroup: "Sortear Grupo",
     reset: "Reiniciar",
-    initialMessage: "Haz clic en 'Iniciar Sorteo' para comenzar.",
     drawingTeam: "Sorteando equipo del bombo {pot}...",
     assigningGroup: "Asignando grupo para {teamName}...",
     drawComplete: "¡Sorteo finalizado!",
@@ -42,12 +42,12 @@ const content = {
     toastDescription: "Se une a los equipos del grupo."
   },
   en: {
-    startDraw: "Start Draw",
+    startDraw: "Start Animated Draw",
+    fastDraw: "Fast Draw",
     nextStep: "Next",
     drawTeam: "Draw Team",
     drawGroup: "Draw Group",
     reset: "Reset",
-    initialMessage: "Click 'Start Draw' to begin.",
     drawingTeam: "Drawing team from pot {pot}...",
     assigningGroup: "Assigning group for {teamName}...",
     drawComplete: "Draw Complete!",
@@ -93,9 +93,9 @@ const AnimationPicker = ({
             </div>
         );
 
-        const shuffled = shuffle(items);
+        const shuffled = shuffle([...items]);
         const extended = Array(5).fill(shuffled).flat().map((item, index) => {
-            const itemKey = (typeof item === 'string' ? item : item.code) + `-${index}`;
+            const itemKey = (typeof item === 'string' ? item : item.code) + `-${index}-${Math.random()}`;
             return itemToElement(item, itemKey);
         });
         setDisplayList(extended);
@@ -114,8 +114,10 @@ const AnimationPicker = ({
       
       const sourceList = itemsRef.current;
       const selectedItemKey = typeof selectedItem === 'string' ? selectedItem : selectedItem.code;
-      const targetIndex = sourceList.findIndex(item => (typeof item === 'string' ? item : item.code) === selectedItemKey);
-     
+      // Find the first occurrence in the original shuffled list used to build the display list
+      const firstCycle = displayList.slice(0, sourceList.length);
+      const targetIndex = firstCycle.findIndex(node => (node as React.ReactElement).props.children.props.team?.code === selectedItemKey || (node as React.ReactElement).props.children.props.children === selectedItemKey);
+           
       if (targetIndex === -1) {
           console.error("Selected item not found in animation list", selectedItem);
           onAnimationComplete();
@@ -147,7 +149,7 @@ const AnimationPicker = ({
         {displayList}
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-card/80 via-transparent to-card/80 pointer-events-none" />
-      <div className="absolute top-1/2 -translate-y/1/2 left-0 right-0 h-[80px] border-y-2 border-accent" />
+      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[80px] border-y-2 border-accent" />
     </div>
   );
 };
@@ -168,6 +170,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   
   const [animatingItems, setAnimatingItems] = useState<(Team | string)[]>([]);
   const [selectedItem, setSelectedItem] = useState<Team | string | null>(null);
+  const [isFastDraw, setIsFastDraw] = useState(false);
 
   const drawQueue = useRef<Team[]>([]);
   
@@ -200,13 +203,13 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     setPots(initialPots);
     setGroups(initialGroups);
     setDrawState('idle');
-    setMessage(currentContent.initialMessage);
+    setMessage(currentContent.en.initialMessage);
     setCurrentPot(1);
     setDrawnTeam(null);
     setAssignedGroup(null);
     setAnimatingItems([]);
     setSelectedItem(null);
-  }, [currentContent.initialMessage]);
+  }, [currentContent.en.initialMessage]);
 
   useEffect(() => {
     initializeState();
@@ -232,19 +235,80 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     return GROUP_NAMES.filter(g => isGroupValid(team, currentGroups[g]));
   }
 
-  const handleStartDraw = () => {
-    setDrawState('ready_to_draw_team');
-    setCurrentPot(drawQueue.current[0].pot);
-    setMessage(currentContent.drawingTeam.replace('{pot}', '1'));
+  const handleStartDraw = (fast = false) => {
+    setIsFastDraw(fast);
+    if (fast) {
+      runFastDraw();
+    } else {
+      setDrawState('ready_to_draw_team');
+      setCurrentPot(drawQueue.current[0].pot);
+      setMessage(currentContent.drawingTeam.replace('{pot}', '1'));
+    }
   };
 
   const handleReset = () => {
     initializeState();
   };
 
+  const performDrawStep = () => {
+    const teamToDraw = drawQueue.current.shift();
+    if (!teamToDraw) {
+      setDrawState('finished');
+      setMessage(currentContent.drawComplete);
+      return;
+    }
+
+    const validGroups = getValidGroupsForTeam(teamToDraw, groups);
+    if (validGroups.length === 0) {
+      toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', teamToDraw.name) });
+      handleReset();
+      return null;
+    }
+
+    let finalGroup: Group;
+    if (teamToDraw.pot === 1) {
+      const emptyPot1Groups = GROUP_NAMES.filter(g => groups[g].length === 0);
+      finalGroup = shuffle(emptyPot1Groups)[0];
+    } else {
+      finalGroup = validGroups[0];
+    }
+    
+    const availablePositions = [1, 2, 3, 4].filter(p => !groups[finalGroup].some(t => t.positionInGroup === p));
+    const positionInGroup = (teamToDraw.pot === 1) ? 1 : (shuffle(availablePositions)[0] as Pot);
+    
+    const newTeam = { ...teamToDraw, positionInGroup };
+    
+    return { newTeam, finalGroup };
+  };
+
+  const runFastDraw = () => {
+    let currentGroups = groups;
+    let currentPots = pots;
+
+    while(drawQueue.current.length > 0) {
+      const result = performDrawStep();
+      if (!result) return;
+      const { newTeam, finalGroup } = result;
+
+      currentGroups = {
+        ...currentGroups,
+        [finalGroup]: [...currentGroups[finalGroup], newTeam].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0))
+      };
+      currentPots = {
+        ...currentPots,
+        [newTeam.pot]: currentPots[newTeam.pot].filter(t => t.code !== newTeam.code)
+      };
+    }
+    
+    setGroups(currentGroups);
+    setPots(currentPots);
+    setDrawState('finished');
+    setMessage(currentContent.drawComplete);
+  };
+
+
   const handleNextStep = () => {
     if (drawState === 'ready_to_draw_team') {
-      // Logic to draw a team
       const teamToDraw = drawQueue.current[0];
       setDrawnTeam(teamToDraw);
       setSelectedItem(teamToDraw);
@@ -254,7 +318,6 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       setMessage(currentContent.drawingTeam.replace('{pot}', teamToDraw.pot.toString()));
 
     } else if (drawState === 'team_drawn' && drawnTeam) {
-      // Logic to assign a group
       const validGroups = getValidGroupsForTeam(drawnTeam, groups);
        if (validGroups.length === 0) {
         toast({
@@ -310,6 +373,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         title: currentContent.groupAssigned
           .replace('{teamName}', drawnTeam.name)
           .replace('{groupName}', assignedGroup),
+        description: currentContent.toastDescription
       });
 
       drawQueue.current.shift();
@@ -362,14 +426,21 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
       default:
         return (
-          <div className="h-full flex flex-col items-center justify-center text-center text-primary">
+          <div className="h-full flex flex-col items-center justify-center text-center">
             {drawState === 'finished' ? (
               <>
                 <Award className="h-10 w-10 text-amber-500" />
                 <p className="font-bold mt-2 text-lg">{currentContent.drawComplete}</p>
               </>
             ) : (
-              <p className="text-muted-foreground font-medium">{message}</p>
+             <div className="flex flex-col sm:flex-row gap-4">
+                 <Button onClick={() => handleStartDraw(false)} size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg px-8 py-6 text-lg">
+                    <Play className="mr-2 h-5 w-5" /> {currentContent.startDraw}
+                 </Button>
+                 <Button onClick={() => handleStartDraw(true)} size="lg" variant="secondary" className="shadow-lg px-8 py-6 text-lg">
+                    <Zap className="mr-2 h-5 w-5" /> {currentContent.fastDraw}
+                 </Button>
+             </div>
             )}
           </div>
         );
@@ -378,12 +449,6 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
   const renderActionButton = () => {
     switch(drawState) {
-      case 'idle':
-        return (
-          <Button onClick={handleStartDraw} size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg px-8 py-6 text-lg">
-            <Play className="mr-2 h-5 w-5" /> {currentContent.startDraw}
-          </Button>
-        );
       case 'ready_to_draw_team':
         return (
           <Button onClick={handleNextStep} size="lg" className="px-8 py-6 text-lg">
@@ -436,7 +501,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
               </AnimatePresence>
             </div>
             <div className="flex items-center justify-center">
-              {renderActionButton()}
+              {drawState !== 'idle' && renderActionButton()}
             </div>
           </div>
         </CardContent>
@@ -464,3 +529,5 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   );
 }
  
+
+    
