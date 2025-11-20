@@ -525,5 +525,3 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
-
-    
