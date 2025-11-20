@@ -21,5 +21,8 @@ export interface Match {
     team2: string | { name: string; position: number };
     stadium: string;
     city: string;
+    country: string;
     time: string;
 }
+
+    

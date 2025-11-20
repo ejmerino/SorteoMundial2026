@@ -253,44 +253,51 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   };
 
   const runFastDraw = () => {
-    let currentGroups = Object.fromEntries(GROUP_NAMES.map(name => [name, []])) as Record<Group, Team[]>;
-    let currentPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
-    TEAMS.forEach(team => currentPots[team.pot as Pot].push(team));
-
+    let tempGroups = JSON.parse(JSON.stringify(
+      Object.fromEntries(GROUP_NAMES.map(name => [name, []]))
+    )) as Record<Group, Team[]>;
+    
     Object.entries(HOSTS).forEach(([hostName, groupName]) => {
-        const team = currentPots[1].find(t => t.name === hostName);
-        if (team) {
-            currentGroups[groupName].push({ ...team, positionInGroup: 1 });
-            currentPots[1] = currentPots[1].filter(t => t.name !== hostName);
-        }
+      const team = TEAMS.find(t => t.name === hostName);
+      if (team) {
+        tempGroups[groupName].push({ ...team, positionInGroup: 1 });
+      }
     });
 
+    const teamsToDraw = TEAMS.filter(t => !Object.keys(HOSTS).includes(t.name));
+
     for (let potNum = 1; potNum <= 4; potNum++) {
-        const pot = potNum as Pot;
-        const shuffledTeams = shuffle([...currentPots[pot]]);
+      const pot = potNum as Pot;
+      let teamsInPot = shuffle(teamsToDraw.filter(t => t.pot === pot));
 
-        for (const team of shuffledTeams) {
-            const validGroups = getValidGroupsForTeam(team, currentGroups);
-            if (validGroups.length === 0) {
-                toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
-                handleReset();
-                return;
-            }
-
-            const chosenGroup = shuffle(validGroups)[0];
-            const availablePositions = [1, 2, 3, 4].filter(p => !currentGroups[chosenGroup].some(t => t.positionInGroup === p));
-            const positionInGroup = shuffle(availablePositions)[0] as Pot;
-
-            currentGroups[chosenGroup].push({ ...team, positionInGroup });
-            currentGroups[chosenGroup].sort((a, b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+      for (const team of teamsInPot) {
+        const validGroups = shuffle(getValidGroupsForTeam(team, tempGroups));
+        
+        if (validGroups.length === 0) {
+          toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
+          handleReset(); // Reset if stuck
+          return;
         }
+
+        const chosenGroup = validGroups[0];
+        
+        let positionInGroup: Pot;
+        if (pot === 1) {
+          positionInGroup = 1;
+        } else {
+           const availablePositions = [1, 2, 3, 4].filter(p => !tempGroups[chosenGroup].some(t => t.positionInGroup === p));
+           positionInGroup = shuffle(availablePositions)[0] as Pot;
+        }
+
+        tempGroups[chosenGroup].push({ ...team, positionInGroup });
+        tempGroups[chosenGroup].sort((a, b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+      }
     }
     
-    // Final state update
     const finalPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
     
-    setGroups(currentGroups);
-    setPots(finalPots); // All teams are drawn
+    setGroups(tempGroups);
+    setPots(finalPots);
     drawQueue.current = [];
     setDrawState('finished');
     setMessage(currentContent.drawComplete);
@@ -324,7 +331,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         const emptyPot1Groups = GROUP_NAMES.filter(g => groups[g].length === 0);
         finalGroup = shuffle(emptyPot1Groups)[0];
       } else {
-        finalGroup = validGroups[0];
+        // For pots 2,3,4 find the first valid group alphabetically after shuffling
+        finalGroup = shuffle(validGroups)[0];
       }
 
       setAssignedGroup(finalGroup);
@@ -494,7 +502,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
           </div>
         </CardHeader>
         <CardContent className="p-4 bg-secondary/30 min-h-[16rem]">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 h-full">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 h-full">
             <div className="w-full sm:w-2/3 h-48 sm:h-full relative">
               <AnimatePresence mode="wait">
                 {renderDrawArea()}
@@ -528,10 +536,11 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
       {drawState === 'finished' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <h2 className="text-2xl font-bold text-center mb-4">{currentContent.scheduleTitle}</h2>
             <Schedule groups={groups} lang={lang} />
         </motion.div>
       )}
     </div>
   );
 }
+
+    
