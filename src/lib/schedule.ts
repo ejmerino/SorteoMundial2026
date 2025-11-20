@@ -25,13 +25,13 @@ export const SCHEDULE: Match[] = [
     { gameId: 22, date: "miércoles, 17 de junio de 2026", group: "L", team1: { name: "L3", position: 3 }, team2: { name: "L4", position: 4 }, stadium: "AT&T Stadium", city: "Dallas", country: "United States", time: "18:00" },
     { gameId: 23, date: "miércoles, 17 de junio de 2026", group: "K", team1: { name: "K1", position: 1 }, team2: { name: "K2", position: 2 }, stadium: "NRG Stadium", city: "Houston", country: "United States", time: "15:00" },
     { gameId: 24, date: "miércoles, 17 de junio de 2026", group: "K", team1: { name: "K3", position: 3 }, team2: { name: "K4", position: 4 }, stadium: "Estadio Azteca", city: "Ciudad de México", country: "Mexico", time: "18:00" },
-    { gameId: 25, date: "jueves, 18 de junio de 2026", group: "A", team1: { name: "A1", position: 1 }, team2: { name: "A3", position: 3 }, stadium: "Mercedes-Benz Stadium", city: "Atlanta", country: "United States", time: "15:00" },
-    { gameId: 26, date: "jueves, 18 de junio de 2026", group: "B", team1: { name: "B1", position: 1 }, team2: { name: "B3", position: 3 }, stadium: "SoFi Stadium", city: "Los Angeles", country: "United States", time: "18:00" },
+    { gameId: 25, date: "jueves, 18 de junio de 2026", group: "A", team1: { name: "A2", position: 2 }, team2: { name: "A4", position: 4 }, stadium: "Mercedes-Benz Stadium", city: "Atlanta", country: "United States", time: "15:00" },
+    { gameId: 26, date: "jueves, 18 de junio de 2026", group: "B", team1: { name: "B2", position: 2 }, team2: { name: "B3", position: 3 }, stadium: "SoFi Stadium", city: "Los Angeles", country: "United States", time: "18:00" },
     { gameId: 27, date: "jueves, 18 de junio de 2026", group: "B", team1: "Canada", team2: { name: "B4", position: 4 }, stadium: "BC Place", city: "Vancouver", country: "Canada", time: "15:00" },
     { gameId: 28, date: "jueves, 18 de junio de 2026", group: "A", team1: "Mexico", team2: { name: "A3", position: 3 }, stadium: "Estadio Akron", city: "Guadalajara", country: "Mexico", time: "18:00" },
     { gameId: 29, date: "viernes, 19 de junio de 2026", group: "C", team1: { name: "C1", position: 1 }, team2: { name: "C3", position: 3 }, stadium: "Lincoln Financial Field", city: "Philadelphia", country: "United States", time: "15:00" },
     { gameId: 30, date: "viernes, 19 de junio de 2026", group: "C", team1: { name: "C2", position: 2 }, team2: { name: "C4", position: 4 }, stadium: "Gillette Stadium", city: "Boston", country: "United States", time: "18:00" },
-    { gameId: 31, date: "viernes, 19 de junio de 2026", group: "D", team1: { name: "D1", position: 1 }, team2: { name: "D3", position: 3 }, stadium: "Levi's Stadium", city: "San Francisco", country: "United States", time: "15:00" },
+    { gameId: 31, date: "viernes, 19 de junio de 2026", group: "D", team1: { name: "D2", position: 2 }, team2: { name: "D4", position: 4 }, stadium: "Levi's Stadium", city: "San Francisco", country: "United States", time: "15:00" },
     { gameId: 32, date: "viernes, 19 de junio de 2026", group: "D", team1: "United States", team2: { name: "D3", position: 3 }, stadium: "Lumen Field", city: "Seattle", country: "United States", time: "18:00" },
     { gameId: 33, date: "sábado, 20 de junio de 2026", group: "E", team1: { name: "E1", position: 1 }, team2: { name: "E3", position: 3 }, stadium: "BMO Field", city: "Toronto", country: "Canada", time: "15:00" },
     { gameId: 34, date: "sábado, 20 de junio de 2026", group: "E", team1: { name: "E2", position: 2 }, team2: { name: "E4", position: 4 }, stadium: "Arrowhead Stadium", city: "Kansas City", country: "United States", time: "18:00" },
@@ -72,7 +72,5 @@ export const SCHEDULE: Match[] = [
     { gameId: 69, date: "sábado, 27 de junio de 2026", group: "J", team1: { name: "J4", position: 4 }, team2: { name: "J1", position: 1 }, stadium: "Arrowhead Stadium", city: "Kansas City", country: "United States", time: "15:00" },
     { gameId: 70, date: "sábado, 27 de junio de 2026", group: "J", team1: { name: "J2", position: 2 }, team2: { name: "J3", position: 3 }, stadium: "AT&T Stadium", city: "Dallas", country: "United States", time: "18:00" },
     { gameId: 71, date: "sábado, 27 de junio de 2026", group: "K", team1: { name: "K4", position: 4 }, team2: { name: "K1", position: 1 }, stadium: "Hard Rock Stadium", city: "Miami", country: "United States", time: "15:00" },
-    { gameId: 72, date: "sábado, 27 de junio de 2026", group: "K", team1: { name: "K2", position: 2 }, team2: { name: "K3", position: 3 }, stadium: "Mercedes-Benz Stadium", city: "Atlanta", country: "United States", time: "18:00" },
+    { gameId: 72, date: "sábado, 27 de junio de 2026", group: "K", team1: { name: "K2", position: 2 }, team2: { name: "K3", position: 3 }, stadium: "Mercedes-Benz Stadium", city: "Atlanta", country: "United States", time: "18:00" }
 ];
-
-    
