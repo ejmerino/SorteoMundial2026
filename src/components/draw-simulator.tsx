@@ -68,7 +68,7 @@ const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: T
     }
 
     if (sourceItems.length > 0) {
-      const extended = [...sourceItems, ...sourceItems, ...sourceItems, ...sourceItems];
+      const extended = Array(5).fill(sourceItems).flat().map((item, index) => React.cloneElement(item, { key: `${item.key}-${index}` }));
       setItemsToDisplay(extended);
     }
   }, [teams, groups]);
@@ -81,9 +81,13 @@ const AnimationPicker = ({ teams, groups, onStop, duration = 3000 }: { teams?: T
     listRef.current.style.transition = 'none';
     
     const shuffleAndPick = () => {
-      const totalHeight = itemsToDisplay.length * itemHeight;
-      const randomOffset = Math.floor(Math.random() * itemsToDisplay.length) * itemHeight;
-      const finalPosition = totalHeight * 2 + randomOffset; // Ensure it spins a few times
+      const totalHeight = listRef.current?.scrollHeight || 0;
+      // Adjust the multiplier and logic to get a good random spin
+      const spinCycles = 3;
+      const basePosition = (itemsToDisplay.length / 5) * itemHeight * spinCycles;
+      const randomOffset = Math.floor(Math.random() * (itemsToDisplay.length / 5)) * itemHeight;
+
+      const finalPosition = basePosition + randomOffset;
       
       if (listRef.current) {
         listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
