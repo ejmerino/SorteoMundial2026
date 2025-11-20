@@ -219,18 +219,22 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
   const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
-    
-    // Pot constraint: A group cannot have more than one team from the same pot.
-    if (group.some(t => t.pot === team.pot)) return false;
+
+    // A group cannot have more than one team from the same pot
+    if (group.some(t => t.positionInGroup === team.pot)) return false;
 
     // Confederation constraint
     const uefaCount = group.filter(t => t.confederation.startsWith('UEFA')).length;
+    
     if (team.confederation.startsWith('UEFA')) {
         if (uefaCount >= 2) return false;
     } else if (team.confederation.includes('PLAYOFF')) {
-        // Playoff teams have fewer restrictions, often handled as "wildcards"
-        // Let's assume for simplicity they can join any group that isn't full and doesn't violate the 2-UEFA rule if they are a UEFA playoff
+        // For playoff teams, if it's a UEFA playoff team, check the UEFA limit
+        if (team.confederation.startsWith('UEFA') && uefaCount >= 2) return false;
+        // Non-UEFA playoff teams are assumed to not clash with confederations as their final confederation is unknown.
+        // This is a simplification; a real draw might have more complex rules for playoff spots.
     } else {
+        // For all other confederations, only one team per confederation is allowed in a group.
         if (group.some(t => t.confederation === team.confederation)) return false;
     }
 
@@ -317,18 +321,15 @@ export default function DrawSimulator({ lang }: { lang: string }) {
           const otherTeams = drawQueue.current.filter(t => t.pot !== currentPotVal);
           
           teamsInCurrentPot.sort((a,b) => {
-              // Prioritize non-playoff and non-UEFA teams
-              const aPrio = confederationPriority.indexOf(a.confederation as any);
-              const bPrio = confederationPriority.indexOf(b.confederation as any);
-
-              // Playoff teams and UEFA teams go to the back of the priority list for this pot
               const aIsLowPrio = a.confederation.includes('PLAYOFF') || a.confederation.startsWith('UEFA');
               const bIsLowPrio = b.confederation.includes('PLAYOFF') || b.confederation.startsWith('UEFA');
 
               if (aIsLowPrio && !bIsLowPrio) return 1;
               if (!aIsLowPrio && bIsLowPrio) return -1;
               
-              // If both are high-priority, sort by confederation list
+              const aPrio = confederationPriority.indexOf(a.confederation as any);
+              const bPrio = confederationPriority.indexOf(b.confederation as any);
+
               if (aPrio > -1 && bPrio > -1) {
                 if(aPrio > bPrio) return -1;
                 if(aPrio < bPrio) return 1;
@@ -337,13 +338,12 @@ export default function DrawSimulator({ lang }: { lang: string }) {
               return 0;
           });
           
-          // Reassemble the queue with the sorted pot at the front
           drawQueue.current = [...teamsInCurrentPot, ...otherTeams];
       }
       
       const teamToDraw = drawQueue.current[0];
       
-      const teamsForAnimation = drawQueue.current.filter(t => t.pot === teamToDraw.pot);
+      const teamsForAnimation = pots[teamToDraw.pot];
       
       setAnimatingItems(shuffle([...teamsForAnimation]));
       setSelectedItem(teamToDraw);
@@ -573,3 +573,5 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
+
+    
