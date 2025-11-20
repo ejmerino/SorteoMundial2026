@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEAMS } from '@/lib/data';
 import type { Team, Pot, Group } from '@/lib/types';
-import { shuffle, sleep } from '@/lib/utils';
+import { shuffle } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { PotCard } from '@/components/pot-card';
@@ -203,17 +203,17 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     setPots(initialPots);
     setGroups(initialGroups);
     setDrawState('idle');
-    setMessage(currentContent.en.initialMessage);
+    setMessage("");
     setCurrentPot(1);
     setDrawnTeam(null);
     setAssignedGroup(null);
     setAnimatingItems([]);
     setSelectedItem(null);
-  }, [currentContent.en.initialMessage]);
+  }, [lang]);
 
   useEffect(() => {
     initializeState();
-  }, [initializeState, lang]);
+  }, [initializeState]);
 
   const drawnTeamCount = useMemo(() => {
     return Object.values(groups).flat().length;
@@ -482,8 +482,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         <CardHeader className="bg-gradient-to-br from-primary/90 to-primary/80 dark:from-primary/50 dark:to-primary/40 text-primary-foreground p-4">
           <div className="flex justify-between items-center">
             <div className="flex flex-col">
-              <p className="font-semibold text-lg">{message}</p>
-              <p className="text-sm opacity-80">{48 - drawQueue.current.length} of 48 teams drawn.</p>
+              <p className="font-semibold text-lg">{message || (drawState === 'idle' ? 'Listo para el sorteo' : (drawState === 'finished' ? currentContent.drawComplete : `Bombo ${currentPot}`))}</p>
+              <p className="text-sm opacity-80">{drawnTeamCount} de 48 equipos sorteados.</p>
             </div>
             {drawState !== 'idle' && (
               <Button onClick={handleReset} variant="ghost" size="icon" className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-white/20">
@@ -528,6 +528,3 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
- 
-
-    
