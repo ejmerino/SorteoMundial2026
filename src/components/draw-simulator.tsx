@@ -220,8 +220,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
 
-    // A group cannot have more than one team from the same pot
-    if (group.some(t => t.pot === team.pot)) return false;
+    // A group cannot have a team from the same pot (positionInGroup)
+    if (group.some(t => t.positionInGroup === team.pot)) return false;
 
     // Confederation constraint
     const uefaCount = group.filter(t => t.confederation.startsWith('UEFA')).length;
@@ -229,10 +229,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     if (team.confederation.startsWith('UEFA')) {
         if (uefaCount >= 2) return false;
     } else if (team.confederation.includes('PLAYOFF')) {
-        // For playoff teams, if it's a UEFA playoff team, check the UEFA limit
-        if (team.confederation.startsWith('UEFA') && uefaCount >= 2) return false;
-        // Non-UEFA playoff teams are assumed to not clash with confederations as their final confederation is unknown.
-        // This is a simplification; a real draw might have more complex rules for playoff spots.
+        // Playoff teams have relaxed rules
     } else {
         // For all other confederations, only one team per confederation is allowed in a group.
         if (group.some(t => t.confederation === team.confederation)) return false;
@@ -347,6 +344,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       
       setAnimatingItems(shuffle([...teamsForAnimation]));
       setSelectedItem(teamToDraw);
+      setAnimationType('team');
       setDrawState('drawing_team');
       setCurrentPot(teamToDraw.pot);
       setMessage(currentContent.drawingTeam.replace('{pot}', teamToDraw.pot.toString()));
@@ -400,14 +398,12 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         description: currentContent.toastDescription
       });
       
-      // Actually remove team from the queue
-      const teamIndex = drawQueue.current.findIndex(t => t.code === drawnTeam.code);
-      if (teamIndex > -1) {
-          drawQueue.current.splice(teamIndex, 1);
-      }
+      const teamCodeToRemove = drawnTeam.code;
+      // Remove team from the visual pot
+      setPots(prev => ({...prev, [drawnTeam.pot]: prev[drawnTeam.pot].filter(t => t.code !== teamCodeToRemove)}));
       
-      // Visually remove the drawn team from its pot AFTER group assignment
-      setPots(prev => ({...prev, [drawnTeam.pot]: prev[drawnTeam.pot].filter(t => t.code !== drawnTeam.code)}));
+      // Remove team from the logical queue
+      drawQueue.current = drawQueue.current.filter(t => t.code !== teamCodeToRemove);
       
       setDrawnTeam(null);
       setAnimatingItems([]);
@@ -575,3 +571,4 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 }
 
     
+
