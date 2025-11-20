@@ -70,12 +70,10 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     const initialPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
     const initialGroups = Object.fromEntries(GROUP_NAMES.map(name => [name as Group, []])) as Record<Group, Team[]>;
     
-    // Sort hosts to ensure consistent placement order
     const sortedHosts = Object.keys(HOSTS).sort((a,b) => a.localeCompare(b));
 
     const teamsToPlace = [...TEAMS];
     
-    // Place hosts first
     sortedHosts.forEach(hostName => {
         const teamIndex = teamsToPlace.findIndex(t => t.name === hostName);
         if (teamIndex > -1) {
@@ -86,7 +84,6 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         }
     });
 
-    // Place remaining teams in pots
     teamsToPlace.forEach(team => {
         initialPots[team.pot as Pot].push(team);
     });
@@ -177,23 +174,23 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
   return (
     <div className="space-y-8">
-      <Card className="shadow-lg overflow-hidden">
-        <CardHeader className="bg-primary text-primary-foreground p-4">
+      <Card className="shadow-lg overflow-hidden border-primary/20">
+        <CardHeader className="bg-gradient-to-r from-primary via-blue-800 to-primary text-primary-foreground p-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold">{currentContent.simulationControls}</h2>
             <div className="flex items-center gap-4">
-              <Button onClick={startDraw} disabled={isDrawing || isFinished} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Button onClick={startDraw} disabled={isDrawing || isFinished} className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-md">
                 {isDrawing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
                 {currentContent.startDraw}
               </Button>
-              <Button onClick={handleReset} variant="outline" className="bg-background/80 hover:bg-background">
+              <Button onClick={handleReset} variant="outline" className="bg-background/80 hover:bg-background text-foreground shadow-md">
                 <RotateCw className="mr-2 h-4 w-4" />
                 {currentContent.reset}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-4 bg-primary/5">
+        <CardContent className="p-4 bg-secondary/30">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 h-24">
             <div className="text-center sm:text-left">
               <p className="font-semibold text-primary">{message}</p>
@@ -217,7 +214,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
               </AnimatePresence>
                {!currentPick && isFinished && (
                   <div className="h-full flex flex-col items-center justify-center text-center text-primary">
-                    <Award className="h-8 w-8" />
+                    <Award className="h-8 w-8 text-amber-500" />
                     <p className="font-bold mt-2">{currentContent.drawComplete}</p>
                   </div>
                )}
@@ -226,7 +223,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(pots).map(([num, teams]) => (
           <PotCard key={num} potNumber={num as unknown as Pot} teams={teams} lang={lang} />
         ))}

@@ -26,9 +26,9 @@ export function GroupCard({ groupName, teams, lang }: GroupCardProps) {
   const currentContent = content[lang as keyof typeof content];
 
   return (
-    <Card className="shadow-md transition-all hover:shadow-xl bg-card">
+    <Card className="shadow-lg transition-all hover:shadow-xl hover:-translate-y-1 bg-card border">
       <CardHeader className="p-3 bg-secondary/50">
-        <CardTitle className="text-lg text-primary text-center">
+        <CardTitle className="text-lg font-bold text-primary text-center tracking-wider">
           {currentContent.group} {groupName}
         </CardTitle>
       </CardHeader>
@@ -43,7 +43,7 @@ export function GroupCard({ groupName, teams, lang }: GroupCardProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.5 }}
-                className="flex items-center gap-3 p-2 rounded-md bg-background"
+                className="flex items-center gap-3 p-2 rounded-md bg-background hover:bg-secondary/70"
               >
                 <span className="font-bold text-muted-foreground w-4">{index + 1}</span>
                 {team ? (

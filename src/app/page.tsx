@@ -13,14 +13,14 @@ import { useState, useEffect } from 'react';
 
 const content = {
   es: {
-    title: 'Simulador de Sorteo de la Copa',
+    title: 'Simulador de Sorteo',
     subtitle: 'Copa del Mundo 2026',
     footer: '© 2024 Simulador de Sorteo de la Copa del Mundo 2026. Solo para fines de entretenimiento.',
     langSwitch: 'Cambiar Idioma',
     themeSwitch: 'Cambiar Tema',
   },
   en: {
-    title: 'Copa Draw Simulator',
+    title: 'Draw Simulator',
     subtitle: 'World Cup 2026',
     footer: '© 2024 World Cup 2026 Draw Simulator. For entertainment purposes only.',
     langSwitch: 'Change Language',
@@ -29,7 +29,7 @@ const content = {
 };
 
 export default function Home() {
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [lang, setLang] = useState('es');
   const [mounted, setMounted] = useState(false);
 
@@ -40,6 +40,10 @@ export default function Home() {
       setLang('en');
     }
   }, []);
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
 
   if (!mounted) {
     return null; 
@@ -53,12 +57,12 @@ export default function Home() {
   const currentContent = content[lang as keyof typeof content];
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="py-4 px-4 sm:px-6 lg:px-8 border-b shadow-sm">
+    <div className="flex flex-col min-h-screen bg-background font-sans">
+      <header className="py-4 px-4 sm:px-6 lg:px-8 border-b shadow-sm sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Globe className="h-8 w-8 text-primary" />
-            <h1 className="text-xl sm:text-2xl font-bold text-primary font-headline tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground font-headline tracking-tight">
               {currentContent.title}
             </h1>
           </div>
@@ -82,33 +86,18 @@ export default function Home() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                  <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  <span className="sr-only">{currentContent.themeSwitch}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                  Light
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                  Dark
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                  System
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="outline" size="icon" onClick={toggleTheme} aria-label={currentContent.themeSwitch}>
+              <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">{currentContent.themeSwitch}</span>
+            </Button>
           </div>
         </div>
       </header>
       <main className="flex-1 container mx-auto p-4 sm:p-6 lg:p-8">
         <DrawSimulator lang={lang} />
       </main>
-      <footer className="py-4 px-4 sm:px-6 lg:px-8 border-t mt-auto">
+      <footer className="py-4 px-4 sm:px-6 lg:px-8 border-t mt-auto bg-secondary/50">
         <div className="container mx-auto text-center text-xs text-muted-foreground">
           <p>
             {currentContent.footer}

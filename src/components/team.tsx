@@ -18,7 +18,7 @@ export default function TeamComponent({ team, variant = 'default' }: TeamCompone
         <Image
           src={flagUrl}
           alt={`${team.name} flag`}
-          layout="fill"
+          fill
           objectFit="cover"
         />
       </div>
