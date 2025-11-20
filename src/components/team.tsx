@@ -1,0 +1,30 @@
+"use client";
+
+import type { Team } from '@/lib/types';
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
+
+interface TeamComponentProps {
+  team: Team;
+  variant?: 'default' | 'small';
+}
+
+export default function TeamComponent({ team, variant = 'default' }: TeamComponentProps) {
+  const flagUrl = `https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/${team.code.toLowerCase()}.svg`;
+
+  return (
+    <div className="flex items-center gap-3 w-full">
+      <div className={cn("relative shrink-0 overflow-hidden rounded-sm", variant === 'small' ? 'w-6 h-4 shadow' : 'w-10 h-7 shadow-md')}>
+        <Image
+          src={flagUrl}
+          alt={`${team.name} flag`}
+          layout="fill"
+          objectFit="cover"
+        />
+      </div>
+      <span className={cn("font-medium text-foreground truncate", variant === 'small' ? 'text-xs' : 'text-sm')}>
+        {team.name}
+      </span>
+    </div>
+  );
+}
