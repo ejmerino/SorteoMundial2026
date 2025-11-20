@@ -299,34 +299,32 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       }
       
       const currentPotVal = drawQueue.current[0].pot;
-      let teamsInCurrentPot = drawQueue.current.filter(t => t.pot === currentPotVal);
       
-      // "Rigged" logic: sort teams to draw constrained ones first
-      const confederationPriority: Confederation[] = ['CONMEBOL', 'CAF', 'AFC', 'CONCACAF', 'OFC'];
-      teamsInCurrentPot.sort((a,b) => {
-          const aPrio = confederationPriority.indexOf(a.confederation as any);
-          const bPrio = confederationPriority.indexOf(b.confederation as any);
+      // "Rigged" logic: sort teams to draw constrained ones first for pots 2, 3, 4
+      if (currentPotVal > 1) {
+          const confederationPriority: Confederation[] = ['CONMEBOL', 'CAF', 'AFC', 'CONCACAF', 'OFC'];
+          // Separate the current pot's teams from the queue
+          const teamsInCurrentPot = drawQueue.current.filter(t => t.pot === currentPotVal);
+          const otherTeams = drawQueue.current.filter(t => t.pot !== currentPotVal);
           
-          if(aPrio === -1 && bPrio > -1) return 1; // UEFA/Playoffs go last
-          if(aPrio > -1 && bPrio === -1) return -1;
-          if(aPrio > bPrio) return -1;
-          if(aPrio < bPrio) return 1;
-          return 0;
-      });
-
-      const teamToDraw = teamsInCurrentPot[0];
-      
-      // Find and remove the chosen team from the main queue
-      const teamIndexInQueue = drawQueue.current.findIndex(t => t.code === teamToDraw.code);
-      if (teamIndexInQueue !== -1) {
-          const [removedTeam] = drawQueue.current.splice(teamIndexInQueue, 1);
-          // Put it at the front to be processed
-          drawQueue.current.unshift(removedTeam);
+          teamsInCurrentPot.sort((a,b) => {
+              const aPrio = confederationPriority.indexOf(a.confederation as any);
+              const bPrio = confederationPriority.indexOf(b.confederation as any);
+              
+              if(aPrio === -1 && bPrio > -1) return 1; // UEFA/Playoffs go last
+              if(aPrio > -1 && bPrio === -1) return -1;
+              if(aPrio > bPrio) return -1;
+              if(aPrio < bPrio) return 1;
+              return 0;
+          });
+          
+          // Reassemble the queue with the sorted pot at the front
+          drawQueue.current = [...teamsInCurrentPot, ...otherTeams];
       }
       
-      const teamsForAnimation = TEAMS.filter(t => 
-        drawQueue.current.some(dq => dq.code === t.code && t.pot === teamToDraw.pot)
-      );
+      const teamToDraw = drawQueue.current[0];
+      
+      const teamsForAnimation = drawQueue.current.filter(t => t.pot === teamToDraw.pot);
       
       setAnimatingItems(shuffle([...teamsForAnimation]));
       setSelectedItem(teamToDraw);
@@ -384,7 +382,10 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       });
       
       // Actually remove team from the queue
-      drawQueue.current.shift();
+      const teamIndex = drawQueue.current.findIndex(t => t.code === drawnTeam.code);
+      if (teamIndex > -1) {
+          drawQueue.current.splice(teamIndex, 1);
+      }
       
       // Visually remove the drawn team from its pot AFTER group assignment
       setPots(prev => ({...prev, [drawnTeam.pot]: prev[drawnTeam.pot].filter(t => t.code !== drawnTeam.code)}));
