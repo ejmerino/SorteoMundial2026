@@ -6,6 +6,7 @@ export type Group = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 
 
 export interface Team {
   name: string;
+  name_en?: string;
   code: string;
   confederation: Confederation;
   pot: Pot;
