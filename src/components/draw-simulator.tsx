@@ -255,8 +255,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   };
 
   const runFastDraw = () => {
-    let currentGroups = { ...groups };
-    let currentPots = { ...pots };
+    let currentGroups = JSON.parse(JSON.stringify(groups));
+    let currentPots = JSON.parse(JSON.stringify(pots));
     const queue = [...drawQueue.current];
 
     while(queue.length > 0) {
@@ -283,14 +283,10 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       
       const newTeam = { ...teamToDraw, positionInGroup };
       
-      currentGroups = {
-        ...currentGroups,
-        [finalGroup]: [...currentGroups[finalGroup], newTeam].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0))
-      };
-      currentPots = {
-        ...currentPots,
-        [newTeam.pot]: currentPots[newTeam.pot].filter(t => t.code !== newTeam.code)
-      };
+      currentGroups[finalGroup].push(newTeam);
+      currentGroups[finalGroup].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+
+      currentPots[newTeam.pot] = currentPots[newTeam.pot].filter(t => t.code !== newTeam.code);
     }
     
     setGroups(currentGroups);
