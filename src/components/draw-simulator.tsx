@@ -211,9 +211,12 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     return Object.values(groups).flat().length;
   }, [groups]);
 
-  const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
+  const isGroupValid = useCallback((team: Team, group: Team[], pot: Pot): boolean => {
     if (group.length >= 4) return false;
     
+    // Rule: No more than one team from the same pot in a group.
+    if (group.some(t => t.pot === pot)) return false;
+
     const uefaCount = group.filter(t => t.confederation === 'UEFA' || t.confederation.startsWith('UEFA_PLAYOFF')).length;
 
     if (team.confederation === 'UEFA' || team.confederation.startsWith('UEFA_PLAYOFF')) {
@@ -225,7 +228,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   }, []);
 
   const getValidGroupsForTeam = useCallback((team: Team, currentGroups: Record<Group, Team[]>) => {
-    return shuffle(GROUP_NAMES.filter(g => isGroupValid(team, currentGroups[g])));
+    return shuffle(GROUP_NAMES.filter(g => isGroupValid(team, currentGroups[g], team.pot)));
   }, [isGroupValid]);
 
   const handleStartDraw = (fast = false) => {
@@ -247,24 +250,28 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
   const runFastDraw = useCallback(() => {
     let tempGroups = JSON.parse(JSON.stringify(groups)) as Record<Group, Team[]>;
-    let teamsToDraw = [...drawQueue.current];
+    let tempPots = JSON.parse(JSON.stringify(pots)) as Record<Pot, Team[]>;
     let success = true;
 
-    for (const team of teamsToDraw) {
-        let placed = false;
-        const validGroups = getValidGroupsForTeam(team, tempGroups);
-        
-        for (const groupName of validGroups) {
-            tempGroups[groupName].push({ ...team, positionInGroup: team.pot as Pot });
-            placed = true;
-            break;
+    for (const potNum of [1, 2, 3, 4] as Pot[]) {
+        const teamsInPot = shuffle(tempPots[potNum]);
+        for (const team of teamsInPot) {
+            let placed = false;
+            const validGroups = getValidGroupsForTeam(team, tempGroups);
+            
+            if (validGroups.length > 0) {
+                const groupName = validGroups[0];
+                tempGroups[groupName].push({ ...team, positionInGroup: team.pot });
+                placed = true;
+            }
+            
+            if (!placed) {
+                toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
+                success = false;
+                break;
+            }
         }
-        
-        if (!placed) {
-            toast({ variant: "destructive", title: currentContent.drawErrorTitle, description: currentContent.drawErrorMessage.replace('{teamName}', team.name) });
-            success = false;
-            break;
-        }
+        if (!success) break;
     }
     
     if (success) {
@@ -280,7 +287,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     } else {
       initializeState();
     }
-}, [groups, getValidGroupsForTeam, toast, currentContent, initializeState]);
+}, [groups, pots, getValidGroupsForTeam, toast, currentContent, initializeState]);
 
   const handleNextStep = () => {
     if (drawState === 'ready_to_draw_team') {
@@ -515,3 +522,5 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
+
+    
