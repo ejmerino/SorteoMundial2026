@@ -10,19 +10,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 const content = {
   es: {
     title: 'Simulador de Sorteo',
     subtitle: 'Copa del Mundo 2026',
-    footer: '© 2024 Simulador de Sorteo de la Copa del Mundo 2026. Solo para fines de entretenimiento.',
+    footer: {
+      developedBy: "Desarrollado por:",
+      disclaimer: "Este simulador es solo para fines de entretenimiento. Todas las marcas comerciales, logotipos y nombres de equipos son propiedad de la FIFA y sus respectivas federaciones. No se reclama ninguna afiliación ni propiedad."
+    },
     langSwitch: 'Cambiar Idioma',
     themeSwitch: 'Cambiar Tema',
   },
   en: {
     title: 'Draw Simulator',
     subtitle: 'World Cup 2026',
-    footer: '© 2024 World Cup 2026 Draw Simulator. For entertainment purposes only.',
+    footer: {
+      developedBy: "Developed by:",
+      disclaimer: "This simulator is for entertainment purposes only. All trademarks, logos, and team names are the property of FIFA and their respective federations. No affiliation or ownership is claimed."
+    },
     langSwitch: 'Change Language',
     themeSwitch: 'Change Theme',
   },
@@ -100,10 +107,17 @@ export default function Home() {
       <main className="flex-1 container mx-auto p-4 sm:p-6 lg:p-8">
         <DrawSimulator lang={lang} />
       </main>
-      <footer className="py-4 px-4 sm:px-6 lg:px-8 border-t mt-auto bg-secondary/50">
-        <div className="container mx-auto text-center text-xs text-muted-foreground">
-          <p>
-            {currentContent.footer}
+      <footer className="py-6 px-4 sm:px-6 lg:px-8 border-t mt-auto bg-secondary/50">
+        <div className="container mx-auto text-center text-muted-foreground">
+          <div className="flex justify-center items-center gap-2 mb-2">
+            <span className="text-sm font-semibold">{currentContent.footer.developedBy}</span>
+            <div className="relative h-8 w-24">
+              <Image src="/logos/lbv_group_negro.png" alt="Developer Logo" fill className="object-contain dark:hidden" />
+              <Image src="/logos/lbv_group_blanco.png" alt="Developer Logo" fill className="object-contain hidden dark:block" />
+            </div>
+          </div>
+          <p className="text-xs">
+            {currentContent.footer.disclaimer}
           </p>
         </div>
       </footer>

@@ -124,7 +124,7 @@ const AnimatedPicker = ({ items, onAnimationComplete, type, selectedItem }: { it
         return null;
     }
 
-    if (!items.length) return null;
+    if (!items.length || !selectedItem) return null;
 
     return (
         <div className="relative h-48 w-full flex items-center justify-center overflow-hidden">
@@ -174,12 +174,9 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     
     // Separate hosts from other teams
     const hostTeams: Team[] = [];
-    const regularTeams: Team[] = [];
     TEAMS.forEach(team => {
         if (Object.keys(HOSTS).includes(team.name)) {
             hostTeams.push(team);
-        } else {
-            regularTeams.push(team);
         }
     });
 
@@ -194,9 +191,18 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     // Create the ordered draw queue
     const teamsToDraw: Team[] = [];
     ([1, 2, 3, 4] as Pot[]).forEach(potNum => {
-        // All non-host teams go into the queue, ordered by pot
         const potTeams = TEAMS.filter(t => t.pot === potNum && !Object.keys(HOSTS).includes(t.name));
-        teamsToDraw.push(...potTeams);
+        
+        // "Rigged" logic: sort teams to draw constrained ones first
+        potTeams.sort((a,b) => {
+            const aIsUefa = a.confederation.startsWith('UEFA');
+            const bIsUefa = b.confederation.startsWith('UEFA');
+            if (aIsUefa && !bIsUefa) return 1; // b (non-uefa) comes first
+            if (!aIsUefa && bIsUefa) return -1; // a (non-uefa) comes first
+            return 0;
+        });
+
+        teamsToDraw.push(...shuffle(potTeams));
     });
     
     drawQueue.current = teamsToDraw;
@@ -320,7 +326,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       }
       
       const teamToDraw = drawQueue.current[0];
-      const teamsInPotForAnimation = pots[teamToDraw.pot];
+      const teamsInPotForAnimation = pots[teamToDraw.pot].filter(t => drawQueue.current.some(dq => dq.code === t.code));
       
       setAnimatingItems(shuffle([...teamsInPotForAnimation]));
       setAnimationType('team');
@@ -547,5 +553,3 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
-
-    
