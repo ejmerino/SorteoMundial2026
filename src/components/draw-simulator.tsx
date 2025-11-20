@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TEAMS } from '@/lib/data';
 import type { Team, Pot, Group } from '@/lib/types';
@@ -10,38 +10,43 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PotCard } from '@/components/pot-card';
 import { GroupCard } from '@/components/group-card';
 import TeamComponent from '@/components/team';
-import { Play, RotateCw, Loader2, Award } from 'lucide-react';
+import { Play, RotateCw, Loader2, Award, Zap, Film } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const GROUP_NAMES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
-const HOSTS = {
-  'United States': 'D',
+const HOSTS: Record<string, Group> = {
   'Mexico': 'A',
-  'Canada': 'B'
+  'Canada': 'B',
+  'United States': 'D'
 };
 
 const content = {
   es: {
     simulationControls: "Controles de Simulación",
-    startDraw: "Iniciar Sorteo",
+    fastDraw: "Sorteo Rápido",
+    animatedDraw: "Sorteo Animado",
     reset: "Reiniciar",
-    initialMessage: "Haz clic en 'Iniciar Sorteo' para comenzar la simulación.",
+    initialMessage: "Selecciona un modo de sorteo para comenzar.",
     teamsDrawn: "equipos sorteados",
     drawingFromPot: "Sorteando equipos del Bombo",
     drawComplete: "¡El sorteo ha finalizado!",
     drawErrorTitle: "Error en el Sorteo",
-    drawErrorMessage: "No se pudo colocar {teamName}. Por favor, reinicia el sorteo.",
+    drawErrorMessage: "No se pudo colocar a {teamName}. Por favor, reinicia el sorteo.",
+    pot: "Bombo",
   },
   en: {
     simulationControls: "Simulation Controls",
-    startDraw: "Start Draw",
+    fastDraw: "Fast Draw",
+    animatedDraw: "Animated Draw",
     reset: "Reset",
-    initialMessage: "Click 'Start Draw' to begin the simulation.",
+    initialMessage: "Select a draw mode to begin.",
     teamsDrawn: "teams drawn",
     drawingFromPot: "Drawing teams from Pot",
     drawComplete: "The draw is complete!",
     drawErrorTitle: "Draw Error",
     drawErrorMessage: "Could not place {teamName}. Please reset the draw.",
+    pot: "Pot",
   },
 };
 
@@ -55,37 +60,33 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   const [isFinished, setIsFinished] = useState(false);
   const [currentPick, setCurrentPick] = useState<Team | null>(null);
   const [message, setMessage] = useState("");
+  const [drawMode, setDrawMode] = useState<'fast' | 'animated'>('animated');
 
   const currentContent = content[lang as keyof typeof content];
 
-  useEffect(() => {
-    setMessage(currentContent.initialMessage);
-  }, [currentContent.initialMessage]);
-
-  const drawnTeamCount = useMemo(() => {
-    return Object.values(groups).flat().length;
-  }, [groups]);
-
-  const initializeState = () => {
-    const initialPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
-    const initialGroups = Object.fromEntries(GROUP_NAMES.map(name => [name as Group, []])) as Record<Group, Team[]>;
+  const initializeState = useCallback(() => {
+    let initialPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
+    let initialGroups = Object.fromEntries(GROUP_NAMES.map(name => [name as Group, []])) as Record<Group, Team[]>;
     
-    const sortedHosts = Object.keys(HOSTS).sort((a,b) => a.localeCompare(b));
-
     const teamsToPlace = [...TEAMS];
     
-    sortedHosts.forEach(hostName => {
+    // Pre-assign hosts
+    Object.entries(HOSTS).forEach(([hostName, groupName]) => {
         const teamIndex = teamsToPlace.findIndex(t => t.name === hostName);
         if (teamIndex > -1) {
-            const team = teamsToPlace[teamIndex];
-            const groupName = HOSTS[hostName as keyof typeof HOSTS] as Group;
+            const team = teamsToPlace.splice(teamIndex, 1)[0];
             initialGroups[groupName].push({ ...team, positionInGroup: 1 });
-            teamsToPlace.splice(teamIndex, 1);
         }
     });
 
     teamsToPlace.forEach(team => {
-        initialPots[team.pot as Pot].push(team);
+        if(initialPots[team.pot]) {
+          initialPots[team.pot as Pot].push(team);
+        }
+    });
+
+    Object.keys(initialPots).forEach(potNum => {
+      initialPots[potNum as unknown as Pot] = shuffle(initialPots[potNum as unknown as Pot]);
     });
 
     setPots(initialPots);
@@ -94,12 +95,15 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     setIsFinished(false);
     setCurrentPick(null);
     setMessage(currentContent.initialMessage);
-  };
+  }, [currentContent.initialMessage]);
 
   useEffect(() => {
     initializeState();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
+  }, [initializeState, lang]);
+
+  const drawnTeamCount = useMemo(() => {
+    return Object.values(groups).flat().length;
+  }, [groups]);
 
   const isGroupValid = (team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
@@ -108,84 +112,138 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     if (team.confederation === 'UEFA') {
       if (uefaCount >= 2) return false;
     } else {
-      if (group.some(t => t.confederation === team.confederation)) return false;
+      if (group.some(t => t.confederation === team.confederation && !t.confederation.startsWith('PLAYOFF'))) return false;
     }
     return true;
   };
+
+  const findValidGroupForTeam = (team: Team, currentGroups: Record<Group, Team[]>) => {
+    const availableGroups = shuffle(GROUP_NAMES.filter(g => currentGroups[g as Group].length < 4));
+    for (const groupName of availableGroups) {
+      if (isGroupValid(team, currentGroups[groupName as Group])) {
+        return groupName as Group;
+      }
+    }
+    return null;
+  }
 
   const startDraw = async () => {
     setIsDrawing(true);
     setIsFinished(false);
     
     let tempPots = JSON.parse(JSON.stringify(pots));
-    Object.keys(tempPots).forEach(potNum => {
-      tempPots[potNum] = shuffle(tempPots[potNum]);
-    });
     let tempGroups = JSON.parse(JSON.stringify(groups));
+
+    const animationDelay = drawMode === 'animated' ? 1500 : 10;
+    const potDelay = drawMode === 'animated' ? 1000 : 10;
 
     for (let potNum = 1; potNum <= 4; potNum++) {
       if (tempPots[potNum].length === 0) continue;
       
       setMessage(`${currentContent.drawingFromPot} ${potNum}...`);
-      await sleep(1000);
+      if (drawMode === 'animated') await sleep(potDelay);
 
       for (const team of tempPots[potNum]) {
-        setCurrentPick(team);
-        await sleep(1500);
-        
-        const availableGroups = shuffle(GROUP_NAMES.filter(g => tempGroups[g as Group].length < 4));
-        
-        let placed = false;
-        for (const groupName of availableGroups) {
-          if (isGroupValid(team, tempGroups[groupName as Group])) {
-            const position = tempGroups[groupName as Group].length + 1;
-            tempGroups[groupName as Group].push({ ...team, positionInGroup: position as Pot });
-            placed = true;
-            break;
-          }
+        if (drawMode === 'animated') {
+          setCurrentPick(team);
+          await sleep(animationDelay);
         }
+        
+        const validGroup = findValidGroupForTeam(team, tempGroups);
 
-        if (!placed) {
+        if (validGroup) {
+            const position = tempGroups[validGroup].length + 1;
+            tempGroups[validGroup].push({ ...team, positionInGroup: position as Pot });
+        } else {
             toast({
               variant: "destructive",
               title: currentContent.drawErrorTitle,
               description: currentContent.drawErrorMessage.replace('{teamName}', team.name),
             })
             setIsDrawing(false);
+            initializeState();
             return;
         }
 
-        setGroups({ ...tempGroups });
-        await sleep(500);
+        if (drawMode === 'animated') {
+            setGroups({ ...tempGroups });
+            await sleep(500);
+        }
       }
       tempPots[potNum] = [];
-      setPots(current => ({...current, ...tempPots}));
-      setCurrentPick(null);
+      if (drawMode === 'animated') {
+        setPots(current => ({...current, ...tempPots}));
+        setCurrentPick(null);
+      }
     }
     
+    setGroups(tempGroups);
+    setPots({ 1: [], 2: [], 3: [], 4: [] });
     setMessage(currentContent.drawComplete);
     setIsDrawing(false);
     setIsFinished(true);
+    setCurrentPick(null);
   };
 
   const handleReset = () => {
     initializeState();
   };
 
+  const renderCurrentPickAnimation = () => {
+    if (!currentPick) return null;
+
+    return (
+       <motion.div
+          key={currentPick.code}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={{
+            initial: { opacity: 0, scale: 0.5, y: 100 },
+            animate: { 
+              opacity: 1, 
+              scale: 1, 
+              y: 0,
+              transition: { 
+                type: 'spring', 
+                stiffness: 260, 
+                damping: 20,
+                duration: 0.7
+              } 
+            },
+            exit: { opacity: 0, scale: 0.8, transition: { duration: 0.3 } },
+          }}
+          className="h-full w-full"
+        >
+          <Card className="h-full border-accent border-2 shadow-2xl flex items-center justify-center p-2 bg-card/80 backdrop-blur-sm">
+              <TeamComponent team={currentPick} />
+          </Card>
+        </motion.div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <Card className="shadow-lg overflow-hidden border-primary/20">
         <CardHeader className="bg-gradient-to-r from-primary via-blue-800 to-primary text-primary-foreground p-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <h2 className="text-lg font-bold">{currentContent.simulationControls}</h2>
-            <div className="flex items-center gap-4">
-              <Button onClick={startDraw} disabled={isDrawing || isFinished} className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-md">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <Tabs value={drawMode} onValueChange={(value) => setDrawMode(value as 'fast' | 'animated')} className="w-auto">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="animated" disabled={isDrawing}>
+                    <Film className="mr-2"/> {currentContent.animatedDraw}
+                  </TabsTrigger>
+                  <TabsTrigger value="fast" disabled={isDrawing}>
+                    <Zap className="mr-2"/> {currentContent.fastDraw}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Button onClick={startDraw} disabled={isDrawing || isFinished} className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-md px-6">
                 {isDrawing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                {currentContent.startDraw}
               </Button>
               <Button onClick={handleReset} variant="outline" className="bg-background/80 hover:bg-background text-foreground shadow-md">
-                <RotateCw className="mr-2 h-4 w-4" />
-                {currentContent.reset}
+                <RotateCw className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -196,28 +254,29 @@ export default function DrawSimulator({ lang }: { lang: string }) {
               <p className="font-semibold text-primary">{message}</p>
               <p className="text-sm text-muted-foreground">{drawnTeamCount} of 48 {currentContent.teamsDrawn}.</p>
             </div>
-            <div className="w-full sm:w-72 h-full">
-              <AnimatePresence>
-                {currentPick && (
+            <div className="w-full sm:w-72 h-full relative">
+              <AnimatePresence mode="wait">
+                {isDrawing && drawMode === 'animated' ? (
+                  renderCurrentPickAnimation()
+                ) : (
                   <motion.div
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -50 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                    className="h-full"
+                    key="status"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="h-full flex flex-col items-center justify-center text-center text-primary"
                   >
-                    <Card className="h-full border-accent border-2 shadow-2xl animate-pulse flex items-center justify-center p-2 bg-card">
-                       <TeamComponent team={currentPick} />
-                    </Card>
+                    {isFinished ? (
+                      <>
+                        <Award className="h-8 w-8 text-amber-500" />
+                        <p className="font-bold mt-2">{currentContent.drawComplete}</p>
+                      </>
+                    ) : (
+                       !isDrawing && <p className="text-muted-foreground">{currentContent.initialMessage}</p>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
-               {!currentPick && isFinished && (
-                  <div className="h-full flex flex-col items-center justify-center text-center text-primary">
-                    <Award className="h-8 w-8 text-amber-500" />
-                    <p className="font-bold mt-2">{currentContent.drawComplete}</p>
-                  </div>
-               )}
             </div>
           </div>
         </CardContent>
@@ -225,7 +284,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Object.entries(pots).map(([num, teams]) => (
-          <PotCard key={num} potNumber={num as unknown as Pot} teams={teams} lang={lang} />
+          <PotCard key={num} potNumber={parseInt(num, 10) as Pot} teams={teams} lang={lang} title={currentContent.pot} />
         ))}
       </div>
 

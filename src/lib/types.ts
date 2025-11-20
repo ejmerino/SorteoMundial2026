@@ -1,4 +1,4 @@
-export type Confederation = 'AFC' | 'CAF' | 'CONCACAF' | 'CONMEBOL' | 'OFC' | 'UEFA';
+export type Confederation = 'AFC' | 'CAF' | 'CONCACAF' | 'CONMEBOL' | 'OFC' | 'UEFA' | 'PLAYOFF_A' | 'PLAYOFF_B';
 
 export type Pot = 1 | 2 | 3 | 4;
 

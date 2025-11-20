@@ -9,23 +9,14 @@ interface PotCardProps {
   potNumber: Pot;
   teams: Team[];
   lang: string;
+  title: string;
 }
 
-const content = {
-    es: {
-      pot: "Bombo",
-    },
-    en: {
-      pot: "Pot",
-    },
-  };
-
-export function PotCard({ potNumber, teams, lang }: PotCardProps) {
-    const currentContent = content[lang as keyof typeof content];
+export function PotCard({ potNumber, teams, title }: PotCardProps) {
   return (
     <Card className="shadow-md bg-card">
       <CardHeader className="p-3 bg-secondary/50">
-        <CardTitle className="text-md text-primary font-bold">{currentContent.pot} {potNumber}</CardTitle>
+        <CardTitle className="text-md text-primary font-bold">{title} {potNumber}</CardTitle>
       </CardHeader>
       <CardContent className="p-3">
         <div className="grid grid-cols-2 gap-2">
