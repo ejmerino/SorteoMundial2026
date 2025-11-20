@@ -15,12 +15,37 @@ import { useToast } from "@/hooks/use-toast";
 
 const GROUP_NAMES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 const HOSTS = {
+  'United States': 'D',
   'Mexico': 'A',
-  'Canada': 'B',
-  'United States': 'D'
+  'Canada': 'B'
 };
 
-export default function DrawSimulator() {
+const content = {
+  es: {
+    simulationControls: "Controles de Simulación",
+    startDraw: "Iniciar Sorteo",
+    reset: "Reiniciar",
+    initialMessage: "Haz clic en 'Iniciar Sorteo' para comenzar la simulación.",
+    teamsDrawn: "equipos sorteados",
+    drawingFromPot: "Sorteando equipos del Bombo",
+    drawComplete: "¡El sorteo ha finalizado!",
+    drawErrorTitle: "Error en el Sorteo",
+    drawErrorMessage: "No se pudo colocar {teamName}. Por favor, reinicia el sorteo.",
+  },
+  en: {
+    simulationControls: "Simulation Controls",
+    startDraw: "Start Draw",
+    reset: "Reset",
+    initialMessage: "Click 'Start Draw' to begin the simulation.",
+    teamsDrawn: "teams drawn",
+    drawingFromPot: "Drawing teams from Pot",
+    drawComplete: "The draw is complete!",
+    drawErrorTitle: "Draw Error",
+    drawErrorMessage: "Could not place {teamName}. Please reset the draw.",
+  },
+};
+
+export default function DrawSimulator({ lang }: { lang: string }) {
   const { toast } = useToast();
   const [pots, setPots] = useState<Record<Pot, Team[]>>({ 1: [], 2: [], 3: [], 4: [] });
   const [groups, setGroups] = useState<Record<Group, Team[]>>(
@@ -29,7 +54,13 @@ export default function DrawSimulator() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [currentPick, setCurrentPick] = useState<Team | null>(null);
-  const [message, setMessage] = useState("Click 'Start Draw' to begin the simulation.");
+  const [message, setMessage] = useState("");
+
+  const currentContent = content[lang as keyof typeof content];
+
+  useEffect(() => {
+    setMessage(currentContent.initialMessage);
+  }, [currentContent.initialMessage]);
 
   const drawnTeamCount = useMemo(() => {
     return Object.values(groups).flat().length;
@@ -38,16 +69,26 @@ export default function DrawSimulator() {
   const initializeState = () => {
     const initialPots: Record<Pot, Team[]> = { 1: [], 2: [], 3: [], 4: [] };
     const initialGroups = Object.fromEntries(GROUP_NAMES.map(name => [name as Group, []])) as Record<Group, Team[]>;
-    const hostsToPlace = { ...HOSTS };
+    
+    // Sort hosts to ensure consistent placement order
+    const sortedHosts = Object.keys(HOSTS).sort((a,b) => a.localeCompare(b));
 
-    TEAMS.forEach(team => {
-      if (hostsToPlace[team.name as keyof typeof hostsToPlace]) {
-        const groupName = hostsToPlace[team.name as keyof typeof hostsToPlace];
-        initialGroups[groupName as Group].push({ ...team, positionInGroup: 1 });
-        delete hostsToPlace[team.name as keyof typeof hostsToPlace];
-      } else {
+    const teamsToPlace = [...TEAMS];
+    
+    // Place hosts first
+    sortedHosts.forEach(hostName => {
+        const teamIndex = teamsToPlace.findIndex(t => t.name === hostName);
+        if (teamIndex > -1) {
+            const team = teamsToPlace[teamIndex];
+            const groupName = HOSTS[hostName as keyof typeof HOSTS] as Group;
+            initialGroups[groupName].push({ ...team, positionInGroup: 1 });
+            teamsToPlace.splice(teamIndex, 1);
+        }
+    });
+
+    // Place remaining teams in pots
+    teamsToPlace.forEach(team => {
         initialPots[team.pot as Pot].push(team);
-      }
     });
 
     setPots(initialPots);
@@ -55,12 +96,13 @@ export default function DrawSimulator() {
     setIsDrawing(false);
     setIsFinished(false);
     setCurrentPick(null);
-    setMessage("Click 'Start Draw' to begin the simulation.");
+    setMessage(currentContent.initialMessage);
   };
 
   useEffect(() => {
     initializeState();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   const isGroupValid = (team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
@@ -84,57 +126,33 @@ export default function DrawSimulator() {
     });
     let tempGroups = JSON.parse(JSON.stringify(groups));
 
-    // Draw Pot 1
-    setMessage('Drawing teams from Pot 1...');
-    const pot1Groups = GROUP_NAMES.filter(g => !Object.values(HOSTS).includes(g));
-    for (const team of tempPots[1]) {
-      setCurrentPick(team);
-      await sleep(1500);
-      const groupName = pot1Groups.shift() as Group;
-      tempGroups[groupName].push({ ...team, positionInGroup: 1 });
-      setGroups({ ...tempGroups });
-      await sleep(500);
-    }
-    tempPots[1] = [];
-    setPots({ ...tempPots });
-    setCurrentPick(null);
-
-    // Draw Pots 2, 3, 4
-    for (let potNum = 2; potNum <= 4; potNum++) {
-      setMessage(`Drawing teams from Pot ${potNum}...`);
+    for (let potNum = 1; potNum <= 4; potNum++) {
+      if (tempPots[potNum].length === 0) continue;
+      
+      setMessage(`${currentContent.drawingFromPot} ${potNum}...`);
       await sleep(1000);
+
       for (const team of tempPots[potNum]) {
         setCurrentPick(team);
         await sleep(1500);
         
-        const availableGroups = shuffle(GROUP_NAMES.filter(g => tempGroups[g as Group].length < potNum));
+        const availableGroups = shuffle(GROUP_NAMES.filter(g => tempGroups[g as Group].length < 4));
         
         let placed = false;
         for (const groupName of availableGroups) {
           if (isGroupValid(team, tempGroups[groupName as Group])) {
-            tempGroups[groupName as Group].push({ ...team, positionInGroup: potNum as Pot });
+            const position = tempGroups[groupName as Group].length + 1;
+            tempGroups[groupName as Group].push({ ...team, positionInGroup: position as Pot });
             placed = true;
             break;
           }
         }
 
         if (!placed) {
-          // Emergency placement: find any valid group even if it's "full" for this pot round
-           const emergencyGroups = shuffle(GROUP_NAMES.filter(g => tempGroups[g as Group].length < 4));
-           for (const groupName of emergencyGroups) {
-              if (isGroupValid(team, tempGroups[groupName as Group])) {
-                tempGroups[groupName as Group].push({ ...team, positionInGroup: potNum as Pot });
-                placed = true;
-                break;
-              }
-           }
-        }
-        
-        if (!placed) {
             toast({
               variant: "destructive",
-              title: "Draw Error",
-              description: `Could not place ${team.name}. Please reset the draw.`,
+              title: currentContent.drawErrorTitle,
+              description: currentContent.drawErrorMessage.replace('{teamName}', team.name),
             })
             setIsDrawing(false);
             return;
@@ -144,11 +162,11 @@ export default function DrawSimulator() {
         await sleep(500);
       }
       tempPots[potNum] = [];
-      setPots(tempPots);
+      setPots(current => ({...current, ...tempPots}));
       setCurrentPick(null);
     }
     
-    setMessage('The draw is complete!');
+    setMessage(currentContent.drawComplete);
     setIsDrawing(false);
     setIsFinished(true);
   };
@@ -162,15 +180,15 @@ export default function DrawSimulator() {
       <Card className="shadow-lg overflow-hidden">
         <CardHeader className="bg-primary text-primary-foreground p-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-bold">Simulation Controls</h2>
+            <h2 className="text-lg font-bold">{currentContent.simulationControls}</h2>
             <div className="flex items-center gap-4">
               <Button onClick={startDraw} disabled={isDrawing || isFinished} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                 {isDrawing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                Start Draw
+                {currentContent.startDraw}
               </Button>
               <Button onClick={handleReset} variant="outline" className="bg-background/80 hover:bg-background">
                 <RotateCw className="mr-2 h-4 w-4" />
-                Reset
+                {currentContent.reset}
               </Button>
             </div>
           </div>
@@ -179,7 +197,7 @@ export default function DrawSimulator() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 h-24">
             <div className="text-center sm:text-left">
               <p className="font-semibold text-primary">{message}</p>
-              <p className="text-sm text-muted-foreground">{drawnTeamCount} of 48 teams drawn.</p>
+              <p className="text-sm text-muted-foreground">{drawnTeamCount} of 48 {currentContent.teamsDrawn}.</p>
             </div>
             <div className="w-full sm:w-72 h-full">
               <AnimatePresence>
@@ -200,7 +218,7 @@ export default function DrawSimulator() {
                {!currentPick && isFinished && (
                   <div className="h-full flex flex-col items-center justify-center text-center text-primary">
                     <Award className="h-8 w-8" />
-                    <p className="font-bold mt-2">Draw Complete!</p>
+                    <p className="font-bold mt-2">{currentContent.drawComplete}</p>
                   </div>
                )}
             </div>
@@ -210,13 +228,13 @@ export default function DrawSimulator() {
       
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {Object.entries(pots).map(([num, teams]) => (
-          <PotCard key={num} potNumber={num as unknown as Pot} teams={teams} />
+          <PotCard key={num} potNumber={num as unknown as Pot} teams={teams} lang={lang} />
         ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {GROUP_NAMES.map(groupName => (
-          <GroupCard key={groupName} groupName={groupName as Group} teams={groups[groupName as Group]} />
+          <GroupCard key={groupName} groupName={groupName as Group} teams={groups[groupName as Group]} lang={lang} />
         ))}
       </div>
     </div>

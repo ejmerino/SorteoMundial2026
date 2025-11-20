@@ -8,16 +8,28 @@ import TeamComponent from "@/components/team";
 interface GroupCardProps {
   groupName: Group;
   teams: Team[];
+  lang: string;
 }
+const content = {
+  es: {
+    group: "Grupo",
+    empty: "Vacío",
+  },
+  en: {
+    group: "Group",
+    empty: "Empty",
+  },
+};
 
-export function GroupCard({ groupName, teams }: GroupCardProps) {
+export function GroupCard({ groupName, teams, lang }: GroupCardProps) {
   const sortedTeams = [...teams].sort((a, b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
+  const currentContent = content[lang as keyof typeof content];
 
   return (
     <Card className="shadow-md transition-all hover:shadow-xl bg-card">
       <CardHeader className="p-3 bg-secondary/50">
         <CardTitle className="text-lg text-primary text-center">
-          Group {groupName}
+          {currentContent.group} {groupName}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-3 space-y-2 min-h-[220px]">
@@ -37,7 +49,7 @@ export function GroupCard({ groupName, teams }: GroupCardProps) {
                 {team ? (
                   <TeamComponent team={team} />
                 ) : (
-                  <span className="text-sm text-muted-foreground/70 italic">Empty</span>
+                  <span className="text-sm text-muted-foreground/70 italic">{currentContent.empty}</span>
                 )}
               </motion.div>
             );
