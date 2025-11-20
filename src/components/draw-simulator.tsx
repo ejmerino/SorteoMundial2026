@@ -115,34 +115,35 @@ const AnimationPicker = ({
       if (!listRef.current) return;
       
       const sourceList = itemsRef.current;
-      const selectedItemKey = typeof selectedItem === 'string' ? selectedItem : selectedItem.code;
-      // Find the first occurrence in the original shuffled list used to build the display list
-      const firstCycle = displayList.slice(0, sourceList.length);
-      const targetIndex = firstCycle.findIndex(node => (node as React.ReactElement).props.children.props.team?.code === selectedItemKey || (node as React.ReactElement).props.children.props.children === selectedItemKey);
-           
-      if (targetIndex === -1) {
+      const selectedItemCode = typeof selectedItem === 'string' ? selectedItem : selectedItem.code;
+      
+      // We need to find an item in the middle of the display list to land on
+      const middleCycleIndex = Math.floor(3 * sourceList.length);
+      
+      const targetIndexInCycle = sourceList.findIndex(item => (typeof item === 'string' ? item : item.code) === selectedItemCode);
+      
+      if (targetIndexInCycle === -1) {
           console.error("Selected item not found in animation list", selectedItem);
           onAnimationComplete();
           return;
       }
       
-      const totalItemsInCycle = sourceList.length;
-      const cycleHeight = totalItemsInCycle * itemHeight;
-      const spinCycles = 3;
-      
-      const targetPosition = (targetIndex * itemHeight);
-      const finalPosition = (spinCycles * cycleHeight) + targetPosition;
+      const targetIndex = middleCycleIndex + targetIndexInCycle;
+      const targetPosition = targetIndex * itemHeight;
 
       listRef.current.style.transition = `transform ${duration / 1000}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
-      listRef.current.style.transform = `translateY(-${finalPosition}px)`;
+      listRef.current.style.transform = `translateY(-${targetPosition}px)`;
     }
 
-    requestAnimationFrame(() => {
-        requestAnimationFrame(spin);
-    });
+    // Use a small timeout to allow the browser to apply the initial non-transitioned state
+    const timerId = setTimeout(spin, 100);
 
-    const timer = setTimeout(onAnimationComplete, duration);
-    return () => clearTimeout(timer);
+    const animationEndTimer = setTimeout(onAnimationComplete, duration + 100);
+    
+    return () => {
+      clearTimeout(timerId);
+      clearTimeout(animationEndTimer);
+    };
   }, [displayList, selectedItem, onAnimationComplete, duration, itemHeight]);
 
   return (
@@ -196,11 +197,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       }
     });
     
-    const pot1Teams = initialPots[1];
-    const otherTeams = shuffle(pot1Teams);
-    queue.push(...otherTeams);
-
-    for (let potNum = 2; potNum <= 4; potNum++) {
+    for (let potNum = 1; potNum <= 4; potNum++) {
       queue.push(...shuffle(initialPots[potNum as Pot]));
     }
     drawQueue.current = queue;
@@ -208,13 +205,13 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     setPots(initialPots);
     setGroups(initialGroups);
     setDrawState('idle');
-    setMessage("");
+    setMessage(currentContent.ready);
     setCurrentPot(1);
     setDrawnTeam(null);
     setAssignedGroup(null);
     setAnimatingItems([]);
     setSelectedItem(null);
-  }, []);
+  }, [currentContent.ready]);
 
   useEffect(() => {
     initializeState();
@@ -286,7 +283,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       currentGroups[finalGroup].push(newTeam);
       currentGroups[finalGroup].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
 
-      currentPots[newTeam.pot] = currentPots[newTeam.pot].filter(t => t.code !== newTeam.code);
+      currentPots[newTeam.pot] = currentPots[newTeam.pot].filter((t: Team) => t.code !== newTeam.code);
     }
     
     setGroups(currentGroups);
@@ -339,6 +336,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     if (drawState === 'drawing_team' && drawnTeam) {
       setPots(prev => ({...prev, [drawnTeam.pot]: prev[drawnTeam.pot].filter(t => t.code !== drawnTeam.code)}));
       setDrawState('team_drawn');
+      setAnimatingItems([]);
     } else if (drawState === 'drawing_group' && drawnTeam && assignedGroup) {
       
       let positionInGroup: Pot;
@@ -369,6 +367,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       drawQueue.current.shift();
       setDrawnTeam(null);
       setAssignedGroup(null);
+      setAnimatingItems([]);
+      setSelectedItem(null);
       
       if (drawQueue.current.length === 0) {
         setDrawState('finished');
@@ -395,7 +395,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
                   </Card>
                 </div>
               )}
-              <div className={drawState === 'drawing_group' ? "w-1/3" : "w-full"}>
+              <div className={drawState === 'drawing_group' ? "w-2/3" : "w-full"}>
                   <AnimationPicker 
                     items={animatingItems}
                     selectedItem={selectedItem!}
@@ -414,6 +414,20 @@ export default function DrawSimulator({ lang }: { lang: string }) {
           </motion.div>
         );
 
+      case 'idle':
+        return (
+           <div className="h-full flex flex-col items-center justify-center text-center">
+             <div className="flex flex-col sm:flex-row gap-4">
+                 <Button onClick={() => handleStartDraw(false)} size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg px-8 py-6 text-lg">
+                    <Play className="mr-2 h-5 w-5" /> {currentContent.startDraw}
+                 </Button>
+                 <Button onClick={() => handleStartDraw(true)} size="lg" variant="secondary" className="shadow-lg px-8 py-6 text-lg">
+                    <Zap className="mr-2 h-5 w-5" /> {currentContent.fastDraw}
+                 </Button>
+             </div>
+          </div>
+        );
+
       default:
         return (
           <div className="h-full flex flex-col items-center justify-center text-center">
@@ -423,14 +437,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
                 <p className="font-bold mt-2 text-lg">{currentContent.drawComplete}</p>
               </>
             ) : (
-             <div className="flex flex-col sm:flex-row gap-4">
-                 <Button onClick={() => handleStartDraw(false)} size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg px-8 py-6 text-lg">
-                    <Play className="mr-2 h-5 w-5" /> {currentContent.startDraw}
-                 </Button>
-                 <Button onClick={() => handleStartDraw(true)} size="lg" variant="secondary" className="shadow-lg px-8 py-6 text-lg">
-                    <Zap className="mr-2 h-5 w-5" /> {currentContent.fastDraw}
-                 </Button>
-             </div>
+              <div className="text-muted-foreground">{currentContent.ready}</div>
             )}
           </div>
         );
@@ -518,3 +525,5 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
+
+    
