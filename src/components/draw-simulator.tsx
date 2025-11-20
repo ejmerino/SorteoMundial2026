@@ -12,9 +12,11 @@ import { PotCard } from '@/components/pot-card';
 import { GroupCard } from '@/components/group-card';
 import TeamComponent from '@/components/team';
 import Schedule from '@/components/schedule';
-import { Play, RotateCw, Loader2, Award, ChevronsRight, Zap, ChevronRight } from 'lucide-react';
+import { Play, RotateCw, Loader2, Award, ChevronsRight, Zap, ChevronRight, Filter } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+
 
 const GROUP_NAMES: Group[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 const HOSTS: Record<string, Group> = {
@@ -43,6 +45,7 @@ const content = {
     toastDescription: "Se une a los equipos del grupo.",
     ready: "Listo para el sorteo",
     scheduleTitle: "Calendario de Partidos",
+    filterAndSort: "Filtrar y Ordenar",
   },
   en: {
     startDraw: "Start Animated Draw",
@@ -63,6 +66,7 @@ const content = {
     toastDescription: "Joins the teams in the group.",
     ready: "Ready for the draw",
     scheduleTitle: "Match Schedule",
+    filterAndSort: "Filter & Sort",
   },
 };
 
@@ -182,7 +186,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     
     // Strict ordering by pot
     ([1, 2, 3, 4] as Pot[]).forEach(potNum => {
-        teamsToDraw.push(...nonHostTeams.filter(t => t.pot === potNum));
+        teamsToDraw.push(...shuffle(nonHostTeams.filter(t => t.pot === potNum)));
     });
     
     drawQueue.current = teamsToDraw;
@@ -219,12 +223,17 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     // Pot constraint: A group cannot have more than one team from the same pot.
     if (group.some(t => t.pot === team.pot)) return false;
 
+    // Confederation constraint
     const uefaCount = group.filter(t => t.confederation.startsWith('UEFA')).length;
     if (team.confederation.startsWith('UEFA')) {
-      if (uefaCount >= 2) return false;
+        if (uefaCount >= 2) return false;
+    } else if (team.confederation.includes('PLAYOFF')) {
+        // Playoff teams have fewer restrictions, often handled as "wildcards"
+        // Let's assume for simplicity they can join any group that isn't full and doesn't violate the 2-UEFA rule if they are a UEFA playoff
     } else {
-      if (group.some(t => t.confederation === team.confederation && !team.confederation.startsWith('PLAYOFF'))) return false;
+        if (group.some(t => t.confederation === team.confederation)) return false;
     }
+
     return true;
   }, []);
 
@@ -303,18 +312,28 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       // "Rigged" logic: sort teams to draw constrained ones first for pots 2, 3, 4
       if (currentPotVal > 1) {
           const confederationPriority: Confederation[] = ['CONMEBOL', 'CAF', 'AFC', 'CONCACAF', 'OFC'];
-          // Separate the current pot's teams from the queue
+          
           const teamsInCurrentPot = drawQueue.current.filter(t => t.pot === currentPotVal);
           const otherTeams = drawQueue.current.filter(t => t.pot !== currentPotVal);
           
           teamsInCurrentPot.sort((a,b) => {
+              // Prioritize non-playoff and non-UEFA teams
               const aPrio = confederationPriority.indexOf(a.confederation as any);
               const bPrio = confederationPriority.indexOf(b.confederation as any);
+
+              // Playoff teams and UEFA teams go to the back of the priority list for this pot
+              const aIsLowPrio = a.confederation.includes('PLAYOFF') || a.confederation.startsWith('UEFA');
+              const bIsLowPrio = b.confederation.includes('PLAYOFF') || b.confederation.startsWith('UEFA');
+
+              if (aIsLowPrio && !bIsLowPrio) return 1;
+              if (!aIsLowPrio && bIsLowPrio) return -1;
               
-              if(aPrio === -1 && bPrio > -1) return 1; // UEFA/Playoffs go last
-              if(aPrio > -1 && bPrio === -1) return -1;
-              if(aPrio > bPrio) return -1;
-              if(aPrio < bPrio) return 1;
+              // If both are high-priority, sort by confederation list
+              if (aPrio > -1 && bPrio > -1) {
+                if(aPrio > bPrio) return -1;
+                if(aPrio < bPrio) return 1;
+              }
+
               return 0;
           });
           
@@ -548,7 +567,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
       {drawState === 'finished' && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <Schedule groups={groups} lang={lang} />
+            <Schedule groups={groups} lang={lang} content={currentContent}/>
         </motion.div>
       )}
     </div>

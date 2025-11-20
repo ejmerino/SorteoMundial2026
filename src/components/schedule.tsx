@@ -8,13 +8,16 @@ import TeamComponent from '@/components/team';
 import { Calendar, MapPin, Filter, SortAsc, SortDesc } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { Label } from './ui/label';
 
 interface ScheduleProps {
     groups: Record<Group, Team[]>;
     lang: string;
+    content: any; // Using 'any' to avoid type conflicts with draw-simulator content
 }
 
-const content = {
+const scheduleContent = {
     es: {
         game: "Juego",
         scheduleTitle: "Calendario de Partidos",
@@ -27,6 +30,8 @@ const content = {
         sortBy: "Ordenar por",
         date: "Fecha",
         group: "Grupo",
+        filterAndSort: "Filtrar y Ordenar",
+        applyFilters: "Aplicar Filtros"
     },
     en: {
         game: "Game",
@@ -40,6 +45,8 @@ const content = {
         sortBy: "Sort by",
         date: "Date",
         group: "Group",
+        filterAndSort: "Filter & Sort",
+        applyFilters: "Apply Filters"
     },
 };
 
@@ -49,12 +56,13 @@ const countryFlags: Record<string, string> = {
     'United States': 'us'
 };
 
-const Schedule: React.FC<ScheduleProps> = ({ groups, lang }) => {
-    const currentContent = content[lang as keyof typeof content];
+const Schedule: React.FC<ScheduleProps> = ({ groups, lang, content }) => {
+    const currentContent = scheduleContent[lang as keyof typeof scheduleContent];
     const [sortBy, setSortBy] = React.useState<'date' | 'group'>('date');
     const [filterGroup, setFilterGroup] = React.useState<string>('all');
     const [filterStadium, setFilterStadium] = React.useState<string>('all');
     const [filterCountry, setFilterCountry] = React.useState<string>('all');
+    const [isSheetOpen, setSheetOpen] = React.useState(false);
 
     const getTeamByPos = (group: Group, position: number): Team | undefined => {
         return groups[group]?.find(t => t.positionInGroup === position);
@@ -108,50 +116,87 @@ const Schedule: React.FC<ScheduleProps> = ({ groups, lang }) => {
         return acc;
     }, {} as Record<string, Match[]>);
 
+    const filterControls = (
+        <div className="space-y-6">
+            <div className="space-y-2">
+                <Label>{currentContent.filterByGroup}</Label>
+                <Select value={filterGroup} onValueChange={setFilterGroup}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder={currentContent.filterByGroup} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">{currentContent.allGroups}</SelectItem>
+                        {Object.keys(groups).map(g => <SelectItem key={g} value={g}>{currentContent.group} {g}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <Label>{currentContent.filterByStadium}</Label>
+                <Select value={filterStadium} onValueChange={setFilterStadium}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder={currentContent.filterByStadium} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">{currentContent.allStadiums}</SelectItem>
+                        {stadiums.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <Label>{currentContent.filterByCountry}</Label>
+                <Select value={filterCountry} onValueChange={setFilterCountry}>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder={currentContent.filterByCountry} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">{currentContent.allCountries}</SelectItem>
+                        {countries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center justify-between">
+                <Label>{currentContent.sortBy}</Label>
+                <div className="flex items-center gap-2">
+                    <span className='text-sm capitalize'>{sortBy === 'date' ? currentContent.date : currentContent.group}</span>
+                    <Button variant="outline" size="icon" onClick={() => setSortBy(sortBy === 'date' ? 'group' : 'date')}>
+                        {sortBy === 'date' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4"/>}
+                        <span className="sr-only">Toggle Sort Order</span>
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <Card className="shadow-lg border-primary/20 overflow-hidden">
-            <CardHeader className="bg-gradient-to-br from-primary/90 to-primary/80 dark:from-primary/50 dark:to-primary/40 text-primary-foreground p-4">
-                <h2 className="text-2xl font-bold text-center">{currentContent.scheduleTitle}</h2>
+            <CardHeader className="bg-gradient-to-br from-primary/90 to-primary/80 dark:from-primary/50 dark:to-primary/40 text-primary-foreground p-4 flex-row items-center justify-between">
+                <h2 className="text-2xl font-bold">{currentContent.scheduleTitle}</h2>
+                <div className="md:hidden">
+                    <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
+                        <SheetTrigger asChild>
+                            <Button variant="outline" size="icon" className="bg-primary-foreground/10 border-primary-foreground/20 hover:bg-primary-foreground/20 text-primary-foreground">
+                                <Filter className="h-5 w-5" />
+                                <span className="sr-only">{currentContent.filterAndSort}</span>
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent>
+                            <SheetHeader>
+                                <SheetTitle>{currentContent.filterAndSort}</SheetTitle>
+                            </SheetHeader>
+                            <div className="py-4">
+                                {filterControls}
+                            </div>
+                            <Button onClick={() => setSheetOpen(false)} className="w-full">{currentContent.applyFilters}</Button>
+                        </SheetContent>
+                    </Sheet>
+                </div>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
-                 <Card className="p-4 bg-secondary/30">
-                    <div className="flex flex-wrap items-center gap-4">
-                        <Filter className="h-5 w-5 text-muted-foreground" />
-                        <Select value={filterGroup} onValueChange={setFilterGroup}>
-                            <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder={currentContent.filterByGroup} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">{currentContent.allGroups}</SelectItem>
-                                {Object.keys(groups).map(g => <SelectItem key={g} value={g}>{currentContent.group} {g}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                         <Select value={filterStadium} onValueChange={setFilterStadium}>
-                            <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder={currentContent.filterByStadium} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">{currentContent.allStadiums}</SelectItem>
-                                {stadiums.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Select value={filterCountry} onValueChange={setFilterCountry}>
-                            <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder={currentContent.filterByCountry} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">{currentContent.allCountries}</SelectItem>
-                                {countries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <div className="flex items-center gap-2 ml-auto">
-                            <span className="text-sm font-medium text-muted-foreground">{currentContent.sortBy}</span>
-                            <Button variant="outline" size="icon" onClick={() => setSortBy(sortBy === 'date' ? 'group' : 'date')}>
-                                {sortBy === 'date' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4"/>}
-                                <span className="sr-only">Toggle Sort Order</span>
-                            </Button>
-                        </div>
-                    </div>
+                 <Card className="p-4 bg-secondary/30 hidden md:block">
+                     <div className='flex items-center gap-4'>
+                        <Filter className="h-5 w-5 text-muted-foreground hidden lg:block" />
+                        {filterControls}
+                     </div>
                 </Card>
 
                 <div className="space-y-6">
@@ -208,5 +253,3 @@ const TEAMS: Team[] = [
 ];
 
 export default Schedule;
-
-    
