@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { PotCard } from '@/components/pot-card';
 import { GroupCard } from '@/components/group-card';
 import TeamComponent from '@/components/team';
-import { Play, RotateCw, Loader2, Award, Zap, ChevronRight, ChevronsRight, Flag } from 'lucide-react';
+import { Play, RotateCw, Loader2, Award, ChevronRight, ChevronsRight } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
 
@@ -38,7 +38,8 @@ const content = {
     pot: "Bombo",
     group: "Grupo",
     teamDrawn: "Equipo Sorteado",
-    groupAssigned: "Grupo Asignado"
+    groupAssigned: "{teamName} al Grupo {groupName}!",
+    toastDescription: "Se une a los equipos del grupo."
   },
   en: {
     startDraw: "Start Draw",
@@ -55,7 +56,8 @@ const content = {
     pot: "Pot",
     group: "Group",
     teamDrawn: "Team Drawn",
-    groupAssigned: "Group Assigned"
+    groupAssigned: "{teamName} to Group {groupName}!",
+    toastDescription: "Joins the teams in the group."
   },
 };
 
@@ -93,8 +95,8 @@ const AnimationPicker = ({
 
         const shuffled = shuffle(items);
         const extended = Array(5).fill(shuffled).flat().map((item, index) => {
-            const itemKey = typeof item === 'string' ? item : item.code;
-            return itemToElement(item, `${itemKey}-${index}`);
+            const itemKey = (typeof item === 'string' ? item : item.code) + `-${index}`;
+            return itemToElement(item, itemKey);
         });
         setDisplayList(extended);
     }
@@ -145,7 +147,7 @@ const AnimationPicker = ({
         {displayList}
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-card/80 via-transparent to-card/80 pointer-events-none" />
-      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[80px] border-y-2 border-accent" />
+      <div className="absolute top-1/2 -translate-y/1/2 left-0 right-0 h-[80px] border-y-2 border-accent" />
     </div>
   );
 };
@@ -300,8 +302,14 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
       setGroups(prev => {
         const newGroups = {...prev};
-        newGroups[assignedGroup] = [...newGroups[assignedGroup], newTeam];
+        newGroups[assignedGroup] = [...newGroups[assignedGroup], newTeam].sort((a,b) => (a.positionInGroup || 0) - (b.positionInGroup || 0));
         return newGroups;
+      });
+      
+      toast({
+        title: currentContent.groupAssigned
+          .replace('{teamName}', drawnTeam.name)
+          .replace('{groupName}', assignedGroup),
       });
 
       drawQueue.current.shift();
@@ -398,6 +406,8 @@ export default function DrawSimulator({ lang }: { lang: string }) {
             <RotateCw className="mr-2 h-5 w-5" /> {currentContent.reset}
           </Button>
         );
+      default:
+        return null;
     }
   };
 
@@ -410,9 +420,10 @@ export default function DrawSimulator({ lang }: { lang: string }) {
               <p className="font-semibold text-lg">{message}</p>
               <p className="text-sm opacity-80">{48 - drawQueue.current.length} of 48 teams drawn.</p>
             </div>
-            {drawState !== 'idle' && drawState !== 'finished' && (
+            {drawState !== 'idle' && (
               <Button onClick={handleReset} variant="ghost" size="icon" className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-white/20">
                 <RotateCw className="h-5 w-5" />
+                <span className="sr-only">{currentContent.reset}</span>
               </Button>
             )}
           </div>
@@ -452,3 +463,4 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     </div>
   );
 }
+ 
