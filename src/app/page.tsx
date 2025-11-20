@@ -22,6 +22,28 @@ const content = {
     },
     langSwitch: 'Cambiar Idioma',
     themeSwitch: 'Cambiar Tema',
+    drawSimulator: {
+      startDraw: "Iniciar Sorteo Animado",
+      fastDraw: "Sorteo Rápido",
+      nextStep: "Siguiente",
+      drawTeam: "Sortear Equipo",
+      drawGroup: "Asignar Grupo",
+      reset: "Reiniciar",
+      drawingTeam: "Sorteando equipo del bombo {pot}...",
+      assigningGroup: "Asignando grupo para {teamName}...",
+      drawComplete: "¡Sorteo finalizado!",
+      drawErrorTitle: "Error en el Sorteo",
+      drawErrorMessage: "No se pudo colocar a {teamName}. Por favor, reinicia el sorteo.",
+      pot: "Bombo",
+      group: "Group",
+      teamDrawn: "Equipo Sorteado",
+      groupAssigned: "{teamName} al Grupo {groupName}!",
+      toastDescription: "Se une a los equipos del grupo.",
+      ready: "Listo para el sorteo",
+      scheduleTitle: "Calendario de Partidos",
+      filterAndSort: "Filtrar y Ordenar",
+      underConstruction: "En construcción",
+    }
   },
   en: {
     title: 'Draw Simulator',
@@ -32,6 +54,28 @@ const content = {
     },
     langSwitch: 'Change Language',
     themeSwitch: 'Change Theme',
+    drawSimulator: {
+      startDraw: "Start Animated Draw",
+      fastDraw: "Fast Draw",
+      nextStep: "Next",
+      drawTeam: "Draw Team",
+      drawGroup: "Assign Group",
+      reset: "Reset",
+      drawingTeam: "Drawing team from pot {pot}...",
+      assigningGroup: "Assigning group for {teamName}...",
+      drawComplete: "Draw Complete!",
+      drawErrorTitle: "Draw Error",
+      drawErrorMessage: "Could not place {teamName}. Please reset the draw.",
+      pot: "Pot",
+      group: "Group",
+      teamDrawn: "Team Drawn",
+      groupAssigned: "{teamName} to Group {groupName}!",
+      toastDescription: "Joins the teams in the group.",
+      ready: "Ready for the draw",
+      scheduleTitle: "Match Schedule",
+      filterAndSort: "Filter & Sort",
+      underConstruction: "Under Construction",
+    }
   },
 };
 
@@ -108,7 +152,7 @@ export default function Home() {
         </div>
       </header>
       <main className="flex-1 container mx-auto p-4 sm:p-6 lg:p-8">
-        <DrawSimulator lang={lang} />
+        <DrawSimulator content={currentContent.drawSimulator} lang={lang} />
       </main>
       <footer className="py-6 px-4 sm:px-6 lg:px-8 border-t mt-auto bg-secondary/50">
         <div className="container mx-auto text-center text-muted-foreground">

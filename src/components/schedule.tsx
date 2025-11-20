@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { Label } from './ui/label';
+import { TEAMS as ALL_TEAMS } from '@/lib/data'; // Renamed to avoid conflict
 
 interface ScheduleProps {
     groups: Record<Group, Team[]>;
@@ -70,7 +71,7 @@ const Schedule: React.FC<ScheduleProps> = ({ groups, lang, content }) => {
     
     const renderTeam = (teamOrPlaceholder: string | { name: string; position: number }, group: Group) => {
         if (typeof teamOrPlaceholder === 'string') {
-            const team = TEAMS.find(t => t.name === teamOrPlaceholder);
+            const team = ALL_TEAMS.find(t => t.name === teamOrPlaceholder);
             return team ? <TeamComponent team={team} /> : <span className="text-sm text-muted-foreground">{teamOrPlaceholder}</span>;
         }
 
@@ -117,6 +118,55 @@ const Schedule: React.FC<ScheduleProps> = ({ groups, lang, content }) => {
     }, {} as Record<string, Match[]>);
 
     const filterControls = (
+         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-center">
+            <div className="space-y-1">
+                <Label className="text-xs">{currentContent.filterByGroup}</Label>
+                <Select value={filterGroup} onValueChange={setFilterGroup}>
+                    <SelectTrigger>
+                        <SelectValue placeholder={currentContent.filterByGroup} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">{currentContent.allGroups}</SelectItem>
+                        {Object.keys(groups).map(g => <SelectItem key={g} value={g}>{currentContent.group} {g}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-1">
+                <Label className="text-xs">{currentContent.filterByStadium}</Label>
+                <Select value={filterStadium} onValueChange={setFilterStadium}>
+                    <SelectTrigger>
+                        <SelectValue placeholder={currentContent.filterByStadium} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">{currentContent.allStadiums}</SelectItem>
+                        {stadiums.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-1">
+                <Label className="text-xs">{currentContent.filterByCountry}</Label>
+                <Select value={filterCountry} onValueChange={setFilterCountry}>
+                    <SelectTrigger>
+                        <SelectValue placeholder={currentContent.filterByCountry} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">{currentContent.allCountries}</SelectItem>
+                        {countries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-1 self-end">
+                <Label className="text-xs">{currentContent.sortBy}</Label>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" className="w-full justify-between" onClick={() => setSortBy(sortBy === 'date' ? 'group' : 'date')}>
+                        <span className='capitalize'>{sortBy === 'date' ? currentContent.date : currentContent.group}</span>
+                        {sortBy === 'date' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4"/>}
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+     const mobileFilterControls = (
         <div className="space-y-6">
             <div className="space-y-2">
                 <Label>{currentContent.filterByGroup}</Label>
@@ -184,7 +234,7 @@ const Schedule: React.FC<ScheduleProps> = ({ groups, lang, content }) => {
                                 <SheetTitle>{currentContent.filterAndSort}</SheetTitle>
                             </SheetHeader>
                             <div className="py-4">
-                                {filterControls}
+                                {mobileFilterControls}
                             </div>
                             <Button onClick={() => setSheetOpen(false)} className="w-full">{currentContent.applyFilters}</Button>
                         </SheetContent>
@@ -193,10 +243,7 @@ const Schedule: React.FC<ScheduleProps> = ({ groups, lang, content }) => {
             </CardHeader>
             <CardContent className="p-4 space-y-4">
                  <Card className="p-4 bg-secondary/30 hidden md:block">
-                     <div className='flex items-center gap-4'>
-                        <Filter className="h-5 w-5 text-muted-foreground hidden lg:block" />
-                        {filterControls}
-                     </div>
+                    {filterControls}
                 </Card>
 
                 <div className="space-y-6">
@@ -213,7 +260,7 @@ const Schedule: React.FC<ScheduleProps> = ({ groups, lang, content }) => {
                                             <Image 
                                                src={`https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/4x3/${countryFlags[match.country]}.svg`}
                                                alt={`${match.country} flag`}
-                                               layout="fill"
+                                               fill
                                                objectFit="cover"
                                             />
                                         </div>
@@ -244,12 +291,5 @@ const Schedule: React.FC<ScheduleProps> = ({ groups, lang, content }) => {
         </Card>
     );
 };
-
-// Need to add TEAMS to get the flag data for hosts
-const TEAMS: Team[] = [
-  { name: 'Mexico', code: 'mx', confederation: 'CONCACAF', pot: 1 },
-  { name: 'Canada', code: 'ca', confederation: 'CONCACAF', pot: 1 },
-  { name: 'United States', code: 'us', confederation: 'CONCACAF', pot: 1 },
-];
 
 export default Schedule;

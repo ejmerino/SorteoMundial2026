@@ -18,7 +18,6 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-
 const GROUP_NAMES: Group[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
 const HOSTS: Record<string, Group> = {
   'Mexico': 'A',
@@ -26,51 +25,9 @@ const HOSTS: Record<string, Group> = {
   'United States': 'D'
 };
 
-const content = {
-  es: {
-    startDraw: "Iniciar Sorteo Animado",
-    fastDraw: "Sorteo Rápido",
-    nextStep: "Siguiente",
-    drawTeam: "Sortear Equipo",
-    drawGroup: "Asignar Grupo",
-    reset: "Reiniciar",
-    drawingTeam: "Sorteando equipo del bombo {pot}...",
-    assigningGroup: "Asignando grupo para {teamName}...",
-    drawComplete: "¡Sorteo finalizado!",
-    drawErrorTitle: "Error en el Sorteo",
-    drawErrorMessage: "No se pudo colocar a {teamName}. Por favor, reinicia el sorteo.",
-    pot: "Bombo",
-    group: "Group",
-    teamDrawn: "Equipo Sorteado",
-    groupAssigned: "{teamName} al Grupo {groupName}!",
-    toastDescription: "Se une a los equipos del grupo.",
-    ready: "Listo para el sorteo",
-    scheduleTitle: "Calendario de Partidos",
-    filterAndSort: "Filtrar y Ordenar",
-    underConstruction: "En construcción",
-  },
-  en: {
-    startDraw: "Start Animated Draw",
-    fastDraw: "Fast Draw",
-    nextStep: "Next",
-    drawTeam: "Draw Team",
-    drawGroup: "Assign Group",
-    reset: "Reset",
-    drawingTeam: "Drawing team from pot {pot}...",
-    assigningGroup: "Assigning group for {teamName}...",
-    drawComplete: "Draw Complete!",
-    drawErrorTitle: "Draw Error",
-    drawErrorMessage: "Could not place {teamName}. Please reset the draw.",
-    pot: "Pot",
-    group: "Group",
-    teamDrawn: "Team Drawn",
-    groupAssigned: "{teamName} to Group {groupName}!",
-    toastDescription: "Joins the teams in the group.",
-    ready: "Ready for the draw",
-    scheduleTitle: "Match Schedule",
-    filterAndSort: "Filter & Sort",
-    underConstruction: "Under Construction",
-  },
+type DrawSimulatorProps = {
+  content: any;
+  lang: string;
 };
 
 type DrawState = 'idle' | 'ready_to_draw_team' | 'drawing_team' | 'team_drawn' | 'drawing_group' | 'group_assigned' | 'finished';
@@ -151,7 +108,7 @@ const AnimatedPicker = ({ items, onAnimationComplete, type, selectedItem }: { it
 };
 
 
-export default function DrawSimulator({ lang }: { lang: string }) {
+export default function DrawSimulator({ content: currentContent, lang }: DrawSimulatorProps) {
   const { toast } = useToast();
   const [pots, setPots] = useState<Record<Pot, Team[]>>({ 1: [], 2: [], 3: [], 4: [] });
   const [groups, setGroups] = useState<Record<Group, Team[]>>(
@@ -170,9 +127,7 @@ export default function DrawSimulator({ lang }: { lang: string }) {
 
   const drawQueue = useRef<Team[]>([]);
   
-  const currentContent = content[lang as keyof typeof content];
-
- const initializeState = useCallback(() => {
+  const initializeState = useCallback(() => {
     const initialGroups = Object.fromEntries(GROUP_NAMES.map(name => [name, []])) as Record<Group, Team[]>;
     
     TEAMS.forEach(team => {
@@ -204,17 +159,20 @@ export default function DrawSimulator({ lang }: { lang: string }) {
     setPots(displayPots);
     setGroups(initialGroups);
     setDrawState('idle');
-    setMessage(currentContent.ready);
     setCurrentPot(1);
     setDrawnTeam(null);
     setAnimatingItems([]);
     setSelectedItem(null);
-  }, [currentContent.ready]);
+  }, []);
 
 
   useEffect(() => {
     initializeState();
   }, [initializeState]);
+
+  useEffect(() => {
+    if(drawState === 'idle') setMessage(currentContent.ready);
+  }, [currentContent.ready, drawState]);
 
   const drawnTeamCount = useMemo(() => {
     return Object.values(groups).flat().length;
@@ -223,8 +181,6 @@ export default function DrawSimulator({ lang }: { lang: string }) {
   const isGroupValid = useCallback((team: Team, group: Team[]): boolean => {
     if (group.length >= 4) return false;
     
-    // This rule was wrong. It should check for positionInGroup, not pot number.
-    // A group cannot have two teams with the same positionInGroup.
     if (group.some(t => t.positionInGroup === team.pot)) return false;
 
     // Confederation constraint
@@ -314,7 +270,6 @@ export default function DrawSimulator({ lang }: { lang: string }) {
       
       const currentPotVal = drawQueue.current[0].pot;
       
-      // "Rigged" logic: sort teams to draw constrained ones first for pots 2, 3, 4
       if (currentPotVal > 1) {
           const confederationPriority: Confederation[] = ['CONMEBOL', 'CAF', 'AFC', 'CONCACAF', 'OFC'];
           
